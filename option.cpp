@@ -6,6 +6,16 @@
 
 namespace project {
 
+// Default constructor with default values
+Option::Option() {
+    optionType_ = "Call";
+    exerciseType_ = "European";
+    strike_ = 0.0;
+    maturity_ = 0.0;
+    volatility_ = 0.0;
+}
+
+
 // Constructor
 Option::Option(
     const std::string& optionType, 

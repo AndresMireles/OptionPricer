@@ -19,6 +19,10 @@ private:
     double volatility_;
 
 public:
+
+    // Default constructor
+    Option();
+
     // Constructor
     Option(
         const std::string& optionType,

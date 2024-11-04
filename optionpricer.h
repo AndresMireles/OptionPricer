@@ -8,13 +8,13 @@ namespace project {
 
 class OptionPricer {
 public:
-    // Constructor
+    // Constructor with default argument only in declaration
     OptionPricer(
-        const Option& option,
+        Option option,
         int n,
         int k,
         double S0,
-        const std::vector<double>& riskFreeRate,
+        std::vector<double> riskFreeRate,
         double T0 = 0
     );
 
@@ -23,12 +23,19 @@ public:
 
 private:
     // Reference to the option
-    const Option& option_;
-    int n_;
-    int k_;
-    int S0_;
-    const std::vector<double>& riskFreeRate_;
+    Option option_;
+    int n_; // Number of Spot intervals
+    int k_; // Number of time intervals
+    double S0_;
+    std::vector<double> riskFreeRate_;
     double T0_;
+
+    // Grid to hold option values
+    std::vector<std::vector<double>> grid_;
+
+    // Spot and time steps
+    std::vector<double> spotPrices_;
+    std::vector<double> timeSteps_;
 
     // Auxiliary methods for finite difference calculations (placeholders)
     void setupGrid();

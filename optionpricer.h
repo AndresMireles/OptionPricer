@@ -11,26 +11,32 @@ public:
     // Constructor with default argument only in declaration
     OptionPricer(
         Option option,
-        int n,
-        int k,
+        int n, // Number of spot steps
+        int k, // Number of time steps
         double S0,
         std::vector<double> riskFreeRate,
         double T0 = 0
     );
 
     // Method to calculate the option price
-    double computePrice() const;
+    double computePrice();
 
 private:
-    // Reference to the option
-    Option option_;
+
     int n_; // Number of Spot intervals
     int k_; // Number of time intervals
     double S0_;
     std::vector<double> riskFreeRate_;
     double T0_;
 
-    // Grid to hold option values
+    // Parameters of the option
+    std::string optionType_;
+    std::string exerciseType_;
+    double strike_;
+    double maturity_;
+    double volatility_;
+
+  // Grid to hold option values
     std::vector<std::vector<double>> grid_;
 
     // Spot and time steps

@@ -18,8 +18,20 @@ public:
         double T0 = 0
     );
 
-    // Method to calculate the option price
-    double computePrice();
+    // Method to calculate the option price using finite differences
+    double computePricePDE();
+
+    // Method to calculate the option price using Black-Scholes
+    double computePriceBS();
+
+    // Method to compare both prices
+    void comparePrices();
+
+    // Method to analytically cally compute a greek that is provided as input (only valid for European options)
+    double computeBSGreek(const std::string greek);
+
+    // Method to numerically compute a greek that is provided as input
+    double computeNumericalGreek(const std::string greek);
 
 private:
 
@@ -36,7 +48,7 @@ private:
     double maturity_;
     double volatility_;
 
-  // Grid to hold option values
+    // Grid to hold option values
     std::vector<std::vector<double>> grid_;
 
     // Spot and time steps

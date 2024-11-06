@@ -18,11 +18,8 @@ public:
         double T0 = 0
     );
 
-    // Method to calculate the option price using finite differences
-    double computePricePDE();
-
-    // Method to calculate the option price using Black-Scholes
-    double computePriceBS();
+    // Method to compute the price using the method provided as input
+    double computePrice(const std::string method);
 
     // Method to compare both prices
     void comparePrices();
@@ -32,6 +29,8 @@ public:
 
     // Method to numerically compute a greek that is provided as input
     double computeNumericalGreek(const std::string greek);
+
+
 
 private:
 
@@ -59,6 +58,16 @@ private:
     void setupGrid();
     void initializeConditions();
     void performCalculations();
+
+    // Auxiliary functions for the analytical solutions
+    double normCDF(double x) const;
+    double normPDF(double x) const;
+
+    // Method to calculate the option price using finite differences
+    double computePricePDE();
+
+    // Method to calculate the option price using Black-Scholes
+    double computePriceBS();
 };
 
 } // namespace project

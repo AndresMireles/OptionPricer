@@ -140,8 +140,6 @@ void OptionPricer::performCalculations() {
     bool isAmerican = (exerciseType_ == "American");
     bool isCall = (optionType_ == "Call");
 
-    double timeToMaturity = maturity_ - T0_;
-
     // Loop backward in time from maturity to current time T0
     for (int j = k_ - 1; j >= 0; --j) {
         // Set up the tridiagonal system
@@ -209,7 +207,7 @@ void OptionPricer::performCalculations() {
 }
 
 // Function to compute the cumulative distribution function for the standard normal distribution
-double normCDF(double x) {
+double OptionPricer::normCDF(double x) const {
     return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0))); // erf function comes from cmath
 }
 
@@ -242,6 +240,19 @@ double OptionPricer::computePriceBS() {
     return price;
 }
 
+// Actual function that the user can use
+double OptionPricer::computePrice(const std::string method) {
+    if (method == "Black-Scholes") {
+        return computePriceBS();
+    }
+    else if (method == "PDE") {
+        return computePricePDE();
+    }
+    else {
+        throw std::invalid_argument("Method for computing option price must be either 'Black-Scholes' or 'PDE'.");
+    }
+}
+
 // Function to print the comparison of prices
 void OptionPricer::comparePrices() {
     double PDE_price = computePricePDE();
@@ -250,6 +261,11 @@ void OptionPricer::comparePrices() {
     double PDE_error = PDE_price - BS_price;
 
     std::cout << "Black-Scholes price: " << BS_price << ". PDE Price: " << PDE_price << ". PDE Error: " << PDE_error << ". PDE Relative Error: " << std::abs(PDE_error / BS_price) * 100 << "%.";
+}
+
+// Implementation of the standard normal PDF
+double OptionPricer::normPDF(double x) const {
+    return (1.0 / std::sqrt(2.0 * M_PI)) * std::exp(-0.5 * x * x);
 }
 
 // Method to analytically cally compute a greek that is provided as input (only valid for European options)
@@ -267,19 +283,17 @@ double OptionPricer::computeBSGreek(const std::string greek) {
     double d1 = (std::log(S0_ / strike_) + (riskFreeRate_[0] + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * sqrtTime);
     double d2 = d1 - volatility_ * sqrtTime;
 
-    // Calculate N(d1), N(d2), and N'(d1)
+    // Calculate N(d1), N(d2), N(-d2), and N'(d1) for the analytical formulas
     double Nd1 = normCDF(d1);
     double Nd2 = normCDF(d2);
-    double N_minus_d1 = normCDF(-d1);
+    // double N_minus_d1 = normCDF(-d1); // Not needed
     double N_minus_d2 = normCDF(-d2);
-
-    // N'(d1)
     double npd1 = normPDF(d1);
 
-    // Use member variables directly without reassigning
+    // Compute numerical deltas
     if (greek == "Delta") {
         if (optionType_ == "Call") {return Nd1;} // Call delta
-        else {return Nd1 - 1.0;} // Put delta
+        else {return Nd1 - 1.0;} // Put delta (by Put-Call parity)
     } 
     else if (greek == "Gamma") {return npd1 / (S0_ * volatility_ * sqrtTime); } // Gamma is the same for calls and puts
     else if (greek == "Theta") {
@@ -314,7 +328,7 @@ double OptionPricer::computeBSGreek(const std::string greek) {
 
 // Method to numerically compute a greek that is provided as input
 double OptionPricer::computeNumericalGreek(const std::string greek) {
-    
+    return 0.0;
 }
 
 

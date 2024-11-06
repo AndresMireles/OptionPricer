@@ -26,7 +26,7 @@ int main() {
 
     project::OptionPricer pricer(opt, n, k, S0, riskFreeRate, T0);
 
-    // double PDE_price = pricer.computePricePDE();
+    // double PDE_price = pricer.computePrice("PDE");
 
     pricer.comparePrices();
     

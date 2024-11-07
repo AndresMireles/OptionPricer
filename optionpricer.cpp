@@ -45,40 +45,14 @@ OptionPricer::OptionPricer(
 
 }
 
-// Method to calculate the option price
-double OptionPricer::computePricePDE() {
-
-    setupGrid();
-    initializeConditions();
-    performCalculations();
-
-    int spot_index;
-
-    if (n_ % 2 == 0) {
-        // If n is even, S0_ lies between the two middle indices
-        int lower_mid = n_ / 2 - 1;
-        int upper_mid = n_ / 2;
-
-        // Calculate the average price between the two middle grid points
-        return (grid_[lower_mid][0] + grid_[upper_mid][0]) / 2.0;
-    } else {
-        // If n is odd, S0_ is exactly at the middle index
-        spot_index = n_ / 2;
-        return grid_[spot_index][0];
-    }
-
-    
-
-}
-
 // The method for setting up the grid
-void OptionPricer::setupGrid() {
+void OptionPricer::setupGrid(double S0, double maturity) {
     // Set up the grid with n_ + 1 rows and k_ + 1 columns, and fill it with 0
     grid_.resize(n_ + 1, std::vector<double>(k_ + 1, 0.0));
 
     // Define time and spot intervals based on n_, k_, S0_, and T0_
-    double dt = (maturity_ - T0_) / k_;
-    double dS = 2 * S0_ / n_; // Creates a symmetric spot price range around S0_
+    double dt = (maturity - T0_) / k_;
+    double dS = 2 * S0 / n_; // Creates a symmetric spot price range around S0_
 
     // Populate spot prices for each step
     spotPrices_.resize(n_ + 1);
@@ -94,7 +68,7 @@ void OptionPricer::setupGrid() {
 }
 
 // Method for setting up the initial conditions
-void OptionPricer::initializeConditions() {
+void OptionPricer::initializeConditions(double maturity, std::vector<double> riskFreeRate) {
 
     bool isCall = (optionType_ == "Call");
 
@@ -116,7 +90,7 @@ void OptionPricer::initializeConditions() {
         if (isCall) {
             grid_[0][j] = 0.0; // Call option has no value if S = 0
         } else {
-            grid_[0][j] = strike_ * exp(-riskFreeRate_[0] * (maturity_ - t)); // Put option value at S = 0
+            grid_[0][j] = strike_ * exp(-riskFreeRate[0] * (maturity - t)); // Put option value at S = 0
         }
     }
 
@@ -124,7 +98,7 @@ void OptionPricer::initializeConditions() {
     for (int j = 0; j <= k_; ++j) {
         double t = timeSteps_[j];
         if (isCall) {
-            grid_[n_][j] = spotPrices_[n_] - strike_ * exp(-riskFreeRate_[0] * (maturity_ - t));
+            grid_[n_][j] = spotPrices_[n_] - strike_ * exp(-riskFreeRate[0] * (maturity - t));
         } else {
             grid_[n_][j] = 0.0; // Put option has no value if S is very high
         }
@@ -132,7 +106,7 @@ void OptionPricer::initializeConditions() {
 }
 
 // This function is general to calls and puts
-void OptionPricer::performCalculations() {
+void OptionPricer::performCalculations(std::vector<double> riskFreeRate, double volatility) {
     // Time and spot step sizes (already computed in setupGrid)
     double dt = timeSteps_[1] - timeSteps_[0];
     double dS = spotPrices_[1] - spotPrices_[0];
@@ -149,14 +123,14 @@ void OptionPricer::performCalculations() {
         std::vector<double> c(N, 0.0); // Upper diagonal (c_1 to c_N)
         std::vector<double> d(N, 0.0); // Right-hand side
 
-        double r = riskFreeRate_[j]; // Use risk-free rate at current time step
+        double r = riskFreeRate[j]; // Use risk-free rate at current time step
 
         // Loop over interior spot indices
         for (int i = 1; i < n_; ++i) {
             double S = spotPrices_[i];
 
             // Coefficients for the implicit method
-            double alpha = 0.5 * volatility_ * volatility_ * S * S / (dS * dS);
+            double alpha = 0.5 * volatility * volatility * S * S / (dS * dS);
             double beta = r * S / (2.0 * dS);
             double gamma = r;
 
@@ -206,6 +180,30 @@ void OptionPricer::performCalculations() {
     }
 }
 
+// Method to calculate the option price
+double OptionPricer::computePricePDE(double S0, double maturity, std::vector<double> riskFreeRate, double volatility) {
+
+    setupGrid(S0, maturity);
+    initializeConditions(maturity, riskFreeRate);
+    performCalculations(riskFreeRate, volatility);
+
+    int spot_index;
+    // We need to choose the index of the price to return depending on the shape of our grid
+    if (n_ % 2 == 0) {
+        // If n is even, S0_ lies between the two middle indices
+        int lower_mid = n_ / 2 - 1;
+        int upper_mid = n_ / 2;
+
+        // Calculate the average price between the two middle grid points
+        return (grid_[lower_mid][0] + grid_[upper_mid][0]) / 2.0;
+    } else {
+        // If n is odd, S0_ is exactly at the middle index
+        spot_index = n_ / 2;
+        return grid_[spot_index][0];
+    }
+
+}
+
 // Function to compute the cumulative distribution function for the standard normal distribution
 double OptionPricer::normCDF(double x) const {
     return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0))); // erf function comes from cmath
@@ -246,7 +244,7 @@ double OptionPricer::computePrice(const std::string method) {
         return computePriceBS();
     }
     else if (method == "PDE") {
-        return computePricePDE();
+        return computePricePDE(S0_, maturity_, riskFreeRate_, volatility_);
     }
     else {
         throw std::invalid_argument("Method for computing option price must be either 'Black-Scholes' or 'PDE'.");
@@ -255,12 +253,12 @@ double OptionPricer::computePrice(const std::string method) {
 
 // Function to print the comparison of prices
 void OptionPricer::comparePrices() {
-    double PDE_price = computePricePDE();
+    double PDE_price = computePricePDE(S0_, maturity_, riskFreeRate_, volatility_);
     double BS_price = computePriceBS();
 
     double PDE_error = PDE_price - BS_price;
 
-    std::cout << "Black-Scholes price: " << BS_price << ". PDE Price: " << PDE_price << ". PDE Error: " << PDE_error << ". PDE Relative Error: " << std::abs(PDE_error / BS_price) * 100 << "%.";
+    std::cout << "Black-Scholes price: " << BS_price << ". PDE Price: " << PDE_price << ". PDE Error: " << PDE_error << ". PDE Relative Error: " << std::abs(PDE_error / BS_price) * 100 << "%." << std::endl;
 }
 
 // Implementation of the standard normal PDF
@@ -269,7 +267,7 @@ double OptionPricer::normPDF(double x) const {
 }
 
 // Method to analytically cally compute a greek that is provided as input (only valid for European options)
-double OptionPricer::computeBSGreek(const std::string greek) {
+double OptionPricer::computeGreekBS(const std::string greek) {
     // Only applicable for European options
     if (exerciseType_ != "European") {
         throw std::logic_error("Greeks can only be computed analytically for European options.");
@@ -327,9 +325,78 @@ double OptionPricer::computeBSGreek(const std::string greek) {
 }
 
 // Method to numerically compute a greek that is provided as input
-double OptionPricer::computeNumericalGreek(const std::string greek) {
+double OptionPricer::computeGreekNumerical(const std::string greek) {
+    // Finite difference increments
+    double h = S0_ * 0.01;       // 1% change in spot price
+    double deltaT = 0.01 / 365;  // Small change in time (in days)
+    double deltaSigma = 0.01;    // 1% change in volatility
+    double deltaR = 0.0001;      // 0.01% change in risk-free rate
+
+    if (greek == "Delta") {
+        double price_up = computePricePDE(S0_ + h, maturity_, riskFreeRate_, volatility_);
+        double price_down = computePricePDE(S0_ - h, maturity_, riskFreeRate_, volatility_);
+        return (price_up - price_down) / (2 * h);
+    } 
+    else if (greek == "Gamma") {
+        double price_up = computePricePDE(S0_ + h, maturity_, riskFreeRate_, volatility_);
+        double price_mid = computePricePDE(S0_, maturity_, riskFreeRate_, volatility_);
+        double price_down = computePricePDE(S0_ - h, maturity_, riskFreeRate_, volatility_);
+        return (price_up - 2 * price_mid + price_down) / (h * h);
+    } 
+    else if (greek == "Theta") {
+        // Ensure time to maturity remains positive
+        double T_up = maturity_ - deltaT;
+        if (T_up <= T0_) {
+            throw std::logic_error("Delta T is too large, time to maturity becomes negative.");
+        }
+        double price_now = computePricePDE(S0_, maturity_, riskFreeRate_, volatility_);
+        double price_later = computePricePDE(S0_, T_up, riskFreeRate_, volatility_);
+        return (price_later - price_now) / deltaT / 365.0; // Negative value as time decreases
+    } 
+    else if (greek == "Vega") {
+        double price_up = computePricePDE(S0_, maturity_, riskFreeRate_, volatility_ + deltaSigma);
+        double price_down = computePricePDE(S0_, maturity_, riskFreeRate_, volatility_ - deltaSigma);
+        return (price_up - price_down) / (2 * deltaSigma) / 100;
+    } 
+    else if (greek == "Rho") {
+        // Compute the vector of the changed risk free rates
+        std::vector<double> riskFreeRateUp; 
+        std::vector<double> riskFreeRateDown;
+        for (int j = 0; j < k_; j++) {
+            riskFreeRateUp.push_back(riskFreeRate_[j] + deltaR);
+            riskFreeRateDown.push_back(riskFreeRate_[j] - deltaR);
+        } 
+        double price_up = computePricePDE(S0_, maturity_, riskFreeRateUp, volatility_);
+        double price_down = computePricePDE(S0_, maturity_, riskFreeRateDown, volatility_);
+        return (price_up - price_down) / (2 * deltaR) / 100;
+    } 
+    else {
+        throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega, Rho.");
+    }
     return 0.0;
 }
 
+// Actual function that the user can use
+double OptionPricer::computeGreek(const std::string greek, const std::string method) {
+    if (method == "Black-Scholes") {
+        return computeGreekBS(greek);
+    }
+    else if (method == "PDE") {
+        return computeGreekNumerical(greek);
+    }
+    else {
+        throw std::invalid_argument("Method for computing option greek must be either 'Black-Scholes' or 'PDE'.");
+    }
+}
+
+// Function to print the comparison of prices
+void OptionPricer::compareGreeks(std::string greek) {
+    double PDE_greek = computeGreekNumerical(greek);
+    double BS_greek = computeGreekBS(greek);
+
+    double PDE_error = PDE_greek - BS_greek;
+
+    std::cout << "Black-Scholes " << greek << ": " << BS_greek << ". Finite-Differences " << greek << ": " << PDE_greek << ". PDE Error: " << PDE_error << ". PDE Relative Error: " << std::abs(PDE_error / BS_greek) * 100 << "%." << std::endl;
+}
 
 } // namespace project

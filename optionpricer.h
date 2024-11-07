@@ -21,16 +21,14 @@ public:
     // Method to compute the price using the method provided as input
     double computePrice(const std::string method);
 
-    // Method to compare both prices
+    // Method to compare analytical and numerical prices
     void comparePrices();
 
-    // Method to analytically cally compute a greek that is provided as input (only valid for European options)
-    double computeBSGreek(const std::string greek);
+    // Method to compute the price using the method provided as input
+    double computeGreek(const std::string greek, const std::string method);
 
-    // Method to numerically compute a greek that is provided as input
-    double computeNumericalGreek(const std::string greek);
-
-
+    // Method to compare analytical and numerical greeks
+    void compareGreeks(const std::string greek);
 
 private:
 
@@ -55,19 +53,26 @@ private:
     std::vector<double> timeSteps_;
 
     // Auxiliary methods for finite difference calculations (placeholders)
-    void setupGrid();
-    void initializeConditions();
-    void performCalculations();
+    void setupGrid(double S0, double maturity);
+    void initializeConditions(double maturity, std::vector<double> riskFreeRate);
+    void performCalculations(std::vector<double> riskFreeRate, double volatility);
 
     // Auxiliary functions for the analytical solutions
     double normCDF(double x) const;
     double normPDF(double x) const;
 
-    // Method to calculate the option price using finite differences
-    double computePricePDE();
-
-    // Method to calculate the option price using Black-Scholes
+    // Method to calculate the option price using Black-Scholes (only valid for European options)
     double computePriceBS();
+
+    // Method to calculate the option price using finite differences
+    double computePricePDE(double S0, double maturity, std::vector<double> riskFreeRate, double volatility);
+
+    // Method to analytically compute a greek that is provided as input (only valid for European options)
+    double computeGreekBS(const std::string greek);
+
+    // Method to numerically compute a greek that is provided as input
+    double computeGreekNumerical(const std::string greek);
+
 };
 
 } // namespace project

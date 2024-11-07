@@ -7,7 +7,7 @@
 int main() {
 
     // Option parameters
-    std::string optionType = "Put";
+    std::string optionType = "Call";
     std::string exerciseType = "European";
     double strike = 110.0;
     double maturity = 1;
@@ -15,7 +15,7 @@ int main() {
 
     project::Option opt(optionType, exerciseType, strike, maturity, volatility);
 
-    std::cout << opt;
+    std::cout << opt << std::endl;
 
     // Pricer parameters
     int n = 100000; // Number of spot steps
@@ -29,6 +29,12 @@ int main() {
     // double PDE_price = pricer.computePrice("PDE");
 
     pricer.comparePrices();
+
+    pricer.compareGreeks("Delta");
+    pricer.compareGreeks("Gamma");
+    pricer.compareGreeks("Theta");
+    pricer.compareGreeks("Vega");
+    pricer.compareGreeks("Rho");    
     
 
     return 0;

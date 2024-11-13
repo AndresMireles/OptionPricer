@@ -14,6 +14,7 @@ public:
         int n, // Number of spot steps
         int k, // Number of time steps
         double S0,
+        std::vector<double> riskFreeTimes,
         std::vector<double> riskFreeRates,
         double T0 = 0
     );
@@ -34,7 +35,9 @@ private:
     int n_; // Number of spot intervals
     int k_; // Number of time intervals
     double S0_;
+    std::vector<double> riskFreeTimes_;
     std::vector<double> riskFreeRates_;
+    double interpolateRiskFreeRate(double t, double deltaR = 0.0); // Method to interpolate the risk free rates
     double T0_;
 
     // Parameters of the option
@@ -53,8 +56,8 @@ private:
 
     // Auxiliary methods for finite difference calculations
     void setupGrid(double S0, double maturity);
-    void initializeConditions(double maturity, std::vector<double> riskFreeRates);
-    void performCalculations(std::vector<double> riskFreeRates, double volatility);
+    void initializeConditions(double maturity, double deltaR = 0.0);
+    void performCalculations(double volatility, double deltaR = 0.0);
 
     // Auxiliary functions for the analytical solutions
     double normCDF(double x) const;
@@ -64,7 +67,7 @@ private:
     double computePriceBS();
 
     // Method to calculate the option price using finite differences
-    double computePricePDE(double S0, double maturity, std::vector<double> riskFreeRates, double volatility);
+    double computePricePDE(double S0, double maturity, double volatility, double deltaR = 0.0);;
 
     // Method to analytically compute a greek that is provided as input (only valid for European options)
     double computeGreekBS(const std::string greek);

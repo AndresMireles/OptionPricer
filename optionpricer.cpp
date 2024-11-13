@@ -9,6 +9,7 @@ OptionPricer::OptionPricer(
     int n,
     int k,
     double S0,
+    std::vector<double> riskFreeTimes,
     std::vector<double> riskFreeRates,
     double T0
 ) {
@@ -25,14 +26,15 @@ OptionPricer::OptionPricer(
     if (T0 > option.getMaturity()) {
         throw std::invalid_argument("Computation date must be earlier than maturity date.");
     }
-    if (riskFreeRates.size() != static_cast<std::size_t>(k+1)) { // We need to cast k as a size_t to compare with vect.size()
-        throw std::invalid_argument("Risk free rate must be of size k + 1.");
+    if (riskFreeTimes.size() != riskFreeRates.size()) {
+        throw std::invalid_argument("Risk-free times and rates vectors must be of the same size.");
     }
 
     // Pricer parameters
     n_ = n; // Number of spot steps
     k_ = k; // Number of time steps
     S0_ = S0;
+    riskFreeTimes_ = riskFreeTimes;
     riskFreeRates_ = riskFreeRates;
     T0_ = T0;
 
@@ -43,6 +45,31 @@ OptionPricer::OptionPricer(
     maturity_ = option.getMaturity();
     volatility_ = option.getVolatility();
 
+}
+
+// Method to interpolate risk free rates
+double OptionPricer::interpolateRiskFreeRate(double t, double deltaR) {
+    if (riskFreeTimes_.empty()) {
+        throw std::runtime_error("Risk-free times vector is empty.");
+    }
+    if (t <= riskFreeTimes_.front()) {
+        return riskFreeRates_.front() + deltaR;
+    }
+    if (t >= riskFreeTimes_.back()) {
+        return riskFreeRates_.back() + deltaR;
+    }
+    // Linear interpolation
+    for (size_t i = 0; i < riskFreeTimes_.size() - 1; ++i) {
+        if (t >= riskFreeTimes_[i] && t <= riskFreeTimes_[i + 1]) {
+            double t1 = riskFreeTimes_[i];
+            double t2 = riskFreeTimes_[i + 1];
+            double r1 = riskFreeRates_[i];
+            double r2 = riskFreeRates_[i + 1];
+            double interpolatedRate = r1 + (r2 - r1) * (t - t1) / (t2 - t1);
+            return interpolatedRate + deltaR;
+        }
+    }
+    throw std::runtime_error("Failed to interpolate risk-free rate.");
 }
 
 // The method for setting up the grid
@@ -68,18 +95,15 @@ void OptionPricer::setupGrid(double S0, double maturity) {
 }
 
 // Method for setting up the initial conditions
-void OptionPricer::initializeConditions(double maturity, std::vector<double> riskFreeRates) {
-
+void OptionPricer::initializeConditions(double maturity, double deltaR) {
     bool isCall = (optionType_ == "Call");
 
     // Initial condition at maturity (t = T)
     for (int i = 0; i <= n_; ++i) {
         double spot = spotPrices_[i];
         if (isCall) {
-            // Call option payoff at maturity
             grid_[i][k_] = std::max(spot - strike_, 0.0);
         } else {
-            // Put option payoff at maturity
             grid_[i][k_] = std::max(strike_ - spot, 0.0);
         }
     }
@@ -87,26 +111,29 @@ void OptionPricer::initializeConditions(double maturity, std::vector<double> ris
     // Boundary condition for S = 0 (lowest spot price)
     for (int j = 0; j <= k_; ++j) {
         double t = timeSteps_[j];
+        double r = interpolateRiskFreeRate(t, deltaR);
         if (isCall) {
-            grid_[0][j] = 0.0; // Call option has no value if S = 0
+            grid_[0][j] = 0.0;
         } else {
-            grid_[0][j] = strike_ * exp(-riskFreeRates[0] * (maturity - t)); // Put option value at S = 0
+            grid_[0][j] = strike_ * exp(-r * (maturity - t));
         }
     }
 
     // Boundary condition for very high S (highest spot price)
     for (int j = 0; j <= k_; ++j) {
         double t = timeSteps_[j];
+        double r = interpolateRiskFreeRate(t, deltaR);
         if (isCall) {
-            grid_[n_][j] = spotPrices_[n_] - strike_ * exp(-riskFreeRates[0] * (maturity - t));
+            grid_[n_][j] = spotPrices_[n_] - strike_ * exp(-r * (maturity - t));
         } else {
-            grid_[n_][j] = 0.0; // Put option has no value if S is very high
+            grid_[n_][j] = 0.0;
         }
     }
 }
 
+
 // This function is general to calls and puts
-void OptionPricer::performCalculations(std::vector<double> riskFreeRates, double volatility) {
+void OptionPricer::performCalculations(double volatility, double deltaR) {
     // Time and spot step sizes (already computed in setupGrid)
     double dt = timeSteps_[1] - timeSteps_[0];
     double dS = spotPrices_[1] - spotPrices_[0];
@@ -123,7 +150,8 @@ void OptionPricer::performCalculations(std::vector<double> riskFreeRates, double
         std::vector<double> c(N, 0.0); // Upper diagonal (c_1 to c_N)
         std::vector<double> d(N, 0.0); // Right-hand side
 
-        double r = riskFreeRates[j]; // Use risk-free rate at current time step
+        double t = timeSteps_[j]; 
+        double r = interpolateRiskFreeRate(t, deltaR);; // Use risk-free rate at current time step (interpolating)
 
         // Loop over interior spot indices
         for (int i = 1; i < n_; ++i) {
@@ -181,27 +209,20 @@ void OptionPricer::performCalculations(std::vector<double> riskFreeRates, double
 }
 
 // Method to calculate the option price
-double OptionPricer::computePricePDE(double S0, double maturity, std::vector<double> riskFreeRates, double volatility) {
-
+double OptionPricer::computePricePDE(double S0, double maturity, double volatility, double deltaR) {
     setupGrid(S0, maturity);
-    initializeConditions(maturity, riskFreeRates);
-    performCalculations(riskFreeRates, volatility);
+    initializeConditions(maturity, deltaR);
+    performCalculations(volatility, deltaR);
 
     int spot_index;
-    // We need to choose the index of the price to return depending on the shape of our grid
     if (n_ % 2 == 0) {
-        // If n is even, S0_ lies between the two middle indices
         int lower_mid = n_ / 2 - 1;
         int upper_mid = n_ / 2;
-
-        // Calculate the average price between the two middle grid points
         return (grid_[lower_mid][0] + grid_[upper_mid][0]) / 2.0;
     } else {
-        // If n is odd, S0_ is exactly at the middle index
         spot_index = n_ / 2;
         return grid_[spot_index][0];
     }
-
 }
 
 // Function to compute the cumulative distribution function for the standard normal distribution
@@ -216,9 +237,10 @@ double OptionPricer::computePriceBS() {
     }
 
     double timeToMaturity = maturity_ - T0_;
+    double r = interpolateRiskFreeRate(timeToMaturity);
 
     // Calculate d1 and d2
-    double d1 = (std::log(S0_ / strike_) + (riskFreeRates_[k_] + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * std::sqrt(timeToMaturity));
+    double d1 = (std::log(S0_ / strike_) + (r + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * std::sqrt(timeToMaturity));
     double d2 = d1 - volatility_ * std::sqrt(timeToMaturity);
 
     // Calculate N(d1) and N(d2)
@@ -230,10 +252,10 @@ double OptionPricer::computePriceBS() {
     // Compute option price based on type
     double price;
     if (optionType_ == "Call") {
-        price = S0_ * Nd1 - strike_ * std::exp(-riskFreeRates_[0] * (timeToMaturity)) * Nd2;
+        price = S0_ * Nd1 - strike_ * std::exp(-r * (timeToMaturity)) * Nd2;
     } 
     else { // Put
-        price = strike_ * std::exp(-riskFreeRates_[0] * (timeToMaturity)) * N_minus_d2 - S0_ * N_minus_d1;
+        price = strike_ * std::exp(-r * (timeToMaturity)) * N_minus_d2 - S0_ * N_minus_d1;
     }
 
     return price;
@@ -245,7 +267,7 @@ double OptionPricer::computePrice(const std::string method) {
         return computePriceBS();
     }
     else if (method == "PDE") {
-        return computePricePDE(S0_, maturity_, riskFreeRates_, volatility_);
+        return computePricePDE(S0_, maturity_, volatility_);
     }
     else {
         throw std::invalid_argument("Method for computing option price must be either 'Black-Scholes' or 'PDE'.");
@@ -254,7 +276,7 @@ double OptionPricer::computePrice(const std::string method) {
 
 // Function to print the comparison of prices
 void OptionPricer::comparePrices() {
-    double PDE_price = computePricePDE(S0_, maturity_, riskFreeRates_, volatility_);
+    double PDE_price = computePricePDE(S0_, maturity_, volatility_);
     double BS_price = computePriceBS();
 
     double PDE_error = PDE_price - BS_price;
@@ -276,10 +298,11 @@ double OptionPricer::computeGreekBS(const std::string greek) {
 
     // Calculate time to maturity
     double timeToMaturity = maturity_ - T0_;
+    double r = interpolateRiskFreeRate(timeToMaturity);
 
     // Calculate d1 and d2
     double sqrtTime = std::sqrt(timeToMaturity);
-    double d1 = (std::log(S0_ / strike_) + (riskFreeRates_[0] + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * sqrtTime);
+    double d1 = (std::log(S0_ / strike_) + (r + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * sqrtTime);
     double d2 = d1 - volatility_ * sqrtTime;
 
     // Calculate N(d1), N(d2), N(-d2), and N'(d1) for the analytical formulas
@@ -299,13 +322,13 @@ double OptionPricer::computeGreekBS(const std::string greek) {
         if (optionType_ == "Call") {
             // Theta for call
             double term1 = - (S0_ * npd1 * volatility_) / (2.0 * sqrtTime);
-            double term2 = - riskFreeRates_[0] * strike_ * std::exp(-riskFreeRates_[0] * timeToMaturity) * Nd2;
+            double term2 = - r * strike_ * std::exp(-r * timeToMaturity) * Nd2;
             return (term1 + term2) / 365.0; // Convert to per day
         } 
         else { // Put
             // Theta for put
             double term1 = - (S0_ * npd1 * volatility_) / (2.0 * sqrtTime);
-            double term2 = riskFreeRates_[0] * strike_ * std::exp(-riskFreeRates_[0] * timeToMaturity) * N_minus_d2;
+            double term2 = r * strike_ * std::exp(-r * timeToMaturity) * N_minus_d2;
             return (term1 + term2) / 365.0; // Convert to per day
         }
     } 
@@ -313,11 +336,11 @@ double OptionPricer::computeGreekBS(const std::string greek) {
     else if (greek == "Rho") {
         if (optionType_ == "Call") {
             // Rho for call
-            return (strike_ * timeToMaturity * std::exp(-riskFreeRates_[0] * timeToMaturity) * Nd2) / 100.0; // Per 1% change
+            return (strike_ * timeToMaturity * std::exp(-r * timeToMaturity) * Nd2) / 100.0; // Per 1% change
         } 
         else { // Put
             // Rho for put
-            return (-strike_ * timeToMaturity * std::exp(-riskFreeRates_[0] * timeToMaturity) * N_minus_d2) / 100.0; // Per 1% change
+            return (-strike_ * timeToMaturity * std::exp(-r * timeToMaturity) * N_minus_d2) / 100.0; // Per 1% change
         }
     } 
     else {
@@ -334,14 +357,14 @@ double OptionPricer::computeGreekNumerical(const std::string greek) {
     double deltaR = 0.0001;      // 0.01% change in risk-free rate
 
     if (greek == "Delta") {
-        double price_up = computePricePDE(S0_ * (1 + h), maturity_, riskFreeRates_, volatility_);
-        double price_down = computePricePDE(S0_ * (1 - h), maturity_, riskFreeRates_, volatility_);
+        double price_up = computePricePDE(S0_ * (1 + h), maturity_, volatility_);
+        double price_down = computePricePDE(S0_ * (1 - h), maturity_, volatility_);
         return (price_up - price_down) / (2 * S0_ * h);
     } 
     else if (greek == "Gamma") {
-        double price_up = computePricePDE(S0_ * (1 + h), maturity_, riskFreeRates_, volatility_);
-        double price_mid = computePricePDE(S0_, maturity_, riskFreeRates_, volatility_);
-        double price_down = computePricePDE(S0_ * (1 - h), maturity_, riskFreeRates_, volatility_);
+        double price_up = computePricePDE(S0_ * (1 + h), maturity_, volatility_);
+        double price_mid = computePricePDE(S0_, maturity_, volatility_);
+        double price_down = computePricePDE(S0_ * (1 - h), maturity_, volatility_);
         return (price_up - 2 * price_mid + price_down) / ((S0_ * h) * (S0_ * h));
     } 
     else if (greek == "Theta") {
@@ -350,27 +373,20 @@ double OptionPricer::computeGreekNumerical(const std::string greek) {
         if (T_up <= T0_) {
             throw std::logic_error("Delta T is too large, time to maturity becomes negative.");
         }
-        double price_now = computePricePDE(S0_, maturity_, riskFreeRates_, volatility_);
-        double price_later = computePricePDE(S0_, T_up, riskFreeRates_, volatility_);
+        double price_now = computePricePDE(S0_, maturity_, volatility_);
+        double price_later = computePricePDE(S0_, T_up, volatility_);
         return (price_later - price_now) / deltaT / 365.0; // Negative value as time decreases
     } 
     else if (greek == "Vega") {
-        double price_up = computePricePDE(S0_, maturity_, riskFreeRates_, volatility_ + deltaVolatility);
-        double price_down = computePricePDE(S0_, maturity_, riskFreeRates_, volatility_ - deltaVolatility);
+        double price_up = computePricePDE(S0_, maturity_, volatility_ + deltaVolatility);
+        double price_down = computePricePDE(S0_, maturity_, volatility_ - deltaVolatility);
         return (price_up - price_down) / (2 * deltaVolatility) / 100;
     } 
     else if (greek == "Rho") {
-        // Compute the vector of the changed risk free rates
-        std::vector<double> riskFreeRatesUp; 
-        std::vector<double> riskFreeRatesDown;
-        for (int j = 0; j < k_; j++) {
-            riskFreeRatesUp.push_back(riskFreeRates_[j] + deltaR);
-            riskFreeRatesDown.push_back(riskFreeRates_[j] - deltaR);
-        } 
-        double price_up = computePricePDE(S0_, maturity_, riskFreeRatesUp, volatility_);
-        double price_down = computePricePDE(S0_, maturity_, riskFreeRatesDown, volatility_);
-        return (price_up - price_down) / (2 * deltaR) / 100;
-    } 
+        double price_up = computePricePDE(S0_, maturity_, volatility_, deltaR);
+        double price_down = computePricePDE(S0_, maturity_, volatility_, -deltaR);
+        return (price_up - price_down) / (2 * deltaR) / 100; // Per 1% change
+    }
     else {
         throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega, Rho.");
     }

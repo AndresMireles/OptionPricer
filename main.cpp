@@ -21,10 +21,10 @@ int main() {
     int n = 100000; // Number of spot steps
     int k = 1000; // Number of time steps
     double S0 = 120;
-    std::vector<double> riskFreeRate(k+1, 0.07);
+    std::vector<double> riskFreeRates(k+1, 0.07);
     double T0 = 0.0;
 
-    project::OptionPricer pricer(opt, n, k, S0, riskFreeRate, T0);
+    project::OptionPricer pricer(opt, n, k, S0, riskFreeRates, T0);
 
     // double PDE_price = pricer.computePrice("PDE");
 

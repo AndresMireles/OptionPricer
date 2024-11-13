@@ -26,10 +26,11 @@ int main() {
     double S0 = 120;
     std::vector<double> riskFreeTimes = {0.0, 0.5, 1.0};
     std::vector<double> riskFreeRates = {0.1, 0.05, 0.07};
+    double q = 0.01;
     double T0 = 0.0;
 
-    project::OptionPricer pricer(opt, n, k, S0, riskFreeTimes, riskFreeRates, T0);
-    project::OptionPricer pricerAm(optAm, n, k, S0, riskFreeTimes, riskFreeRates, T0);
+    project::OptionPricer pricer(opt, n, k, S0, riskFreeTimes, riskFreeRates, q, T0);
+    project::OptionPricer pricerAm(optAm, n, k, S0, riskFreeTimes, riskFreeRates, q, T0);
 
     // double PDE_price = pricer.computePrice("PDE");
 

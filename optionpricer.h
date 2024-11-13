@@ -16,6 +16,7 @@ public:
         double S0,
         std::vector<double> riskFreeTimes,
         std::vector<double> riskFreeRates,
+        double dividendYield,
         double T0 = 0
     );
 
@@ -37,6 +38,7 @@ private:
     double S0_;
     std::vector<double> riskFreeTimes_;
     std::vector<double> riskFreeRates_;
+    double dividendYield_; // Continuous dividend yield
     double interpolateRiskFreeRate(double t, double deltaR = 0.0); // Method to interpolate the risk free rates
     double T0_;
 

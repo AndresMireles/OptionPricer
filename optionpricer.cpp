@@ -11,6 +11,7 @@ OptionPricer::OptionPricer(
     double S0,
     std::vector<double> riskFreeTimes,
     std::vector<double> riskFreeRates,
+    double dividendYield,
     double T0
 ) {
 
@@ -36,6 +37,7 @@ OptionPricer::OptionPricer(
     S0_ = S0;
     riskFreeTimes_ = riskFreeTimes;
     riskFreeRates_ = riskFreeRates;
+    dividendYield_ = dividendYield;
     T0_ = T0;
 
     // Option parameters
@@ -97,6 +99,7 @@ void OptionPricer::setupGrid(double S0, double maturity) {
 // Method for setting up the initial conditions
 void OptionPricer::initializeConditions(double maturity, double deltaR) {
     bool isCall = (optionType_ == "Call");
+    double q = dividendYield_;
 
     // Initial condition at maturity (t = T)
     for (int i = 0; i <= n_; ++i) {
@@ -124,7 +127,7 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
         double t = timeSteps_[j];
         double r = interpolateRiskFreeRate(t, deltaR);
         if (isCall) {
-            grid_[n_][j] = spotPrices_[n_] - strike_ * exp(-r * (maturity - t));
+            grid_[n_][j] = spotPrices_[n_] * exp(-q * (maturity - t)) - strike_ * exp(-r * (maturity - t));
         } else {
             grid_[n_][j] = 0.0;
         }
@@ -140,6 +143,8 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
 
     bool isAmerican = (exerciseType_ == "American");
     bool isCall = (optionType_ == "Call");
+
+    double q = dividendYield_;
 
     // Loop backward in time from maturity to current time T0
     for (int j = k_ - 1; j >= 0; --j) {
@@ -159,7 +164,7 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
 
             // Coefficients for the implicit method
             double alpha = 0.5 * volatility * volatility * S * S / (dS * dS);
-            double beta = r * S / (2.0 * dS);
+            double beta = (r - q) * S / (2.0 * dS);
             double gamma = r;
 
             a[i - 1] = -dt * (alpha - beta);
@@ -238,9 +243,10 @@ double OptionPricer::computePriceBS() {
 
     double timeToMaturity = maturity_ - T0_;
     double r = interpolateRiskFreeRate(timeToMaturity);
+    double q = dividendYield_;
 
     // Calculate d1 and d2
-    double d1 = (std::log(S0_ / strike_) + (r + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * std::sqrt(timeToMaturity));
+    double d1 = (std::log(S0_ / strike_) + (r - q + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * std::sqrt(timeToMaturity));
     double d2 = d1 - volatility_ * std::sqrt(timeToMaturity);
 
     // Calculate N(d1) and N(d2)
@@ -252,10 +258,10 @@ double OptionPricer::computePriceBS() {
     // Compute option price based on type
     double price;
     if (optionType_ == "Call") {
-        price = S0_ * Nd1 - strike_ * std::exp(-r * (timeToMaturity)) * Nd2;
+        price = S0_ * exp(-q * timeToMaturity) * Nd1 - strike_ * exp(-r * timeToMaturity) * Nd2;
     } 
     else { // Put
-        price = strike_ * std::exp(-r * (timeToMaturity)) * N_minus_d2 - S0_ * N_minus_d1;
+        price = strike_ * exp(-r * timeToMaturity) * N_minus_d2 - S0_ * exp(-q * timeToMaturity) * N_minus_d1;
     }
 
     return price;
@@ -291,69 +297,61 @@ double OptionPricer::normPDF(double x) const {
 
 // Method to analytically cally compute a greek that is provided as input (only valid for European options)
 double OptionPricer::computeGreekBS(const std::string greek) {
-    // Only applicable for European options
     if (exerciseType_ != "European") {
         throw std::logic_error("Greeks can only be computed analytically for European options.");
     }
 
-    // Calculate time to maturity
     double timeToMaturity = maturity_ - T0_;
-    double r = interpolateRiskFreeRate(timeToMaturity);
-
-    // Calculate d1 and d2
+    double r = interpolateRiskFreeRate(T0_);
+    double q = dividendYield_;
     double sqrtTime = std::sqrt(timeToMaturity);
-    double d1 = (std::log(S0_ / strike_) + (r + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * sqrtTime);
+
+    // Calculate d1 and d2 with dividend yield
+    double d1 = (std::log(S0_ / strike_) + (r - q + 0.5 * volatility_ * volatility_) * timeToMaturity) /
+                (volatility_ * sqrtTime);
     double d2 = d1 - volatility_ * sqrtTime;
 
-    // Calculate N(d1), N(d2), N(-d2), and N'(d1) for the analytical formulas
+    // Calculate N(d1), N(d2), N(-d2), and N'(d1)
     double Nd1 = normCDF(d1);
     double Nd2 = normCDF(d2);
-    // double N_minus_d1 = normCDF(-d1); // Not needed
+    double N_minus_d1 = normCDF(-d1);
     double N_minus_d2 = normCDF(-d2);
     double npd1 = normPDF(d1);
 
-    // Compute numerical deltas
+    // Compute Greeks with dividend yield
     if (greek == "Delta") {
-        if (optionType_ == "Call") {return Nd1;} // Call delta
-        else {return Nd1 - 1.0;} // Put delta (by Put-Call parity)
+        if (optionType_ == "Call") {return exp(-q * timeToMaturity) * Nd1;} // Call delta 
+        else {return exp(-q * timeToMaturity) * (Nd1 - 1.0);} // Put delta
     } 
-    else if (greek == "Gamma") {return npd1 / (S0_ * volatility_ * sqrtTime); } // Gamma is the same for calls and puts
+    else if (greek == "Gamma") {return (exp(-q * timeToMaturity) * npd1) / (S0_ * volatility_ * sqrtTime);} 
     else if (greek == "Theta") {
         if (optionType_ == "Call") {
-            // Theta for call
-            double term1 = - (S0_ * npd1 * volatility_) / (2.0 * sqrtTime);
-            double term2 = - r * strike_ * std::exp(-r * timeToMaturity) * Nd2;
-            return (term1 + term2) / 365.0; // Convert to per day
+            double term1 = - (S0_ * npd1 * volatility_ * exp(-q * timeToMaturity)) / (2.0 * sqrtTime);
+            double term2 = q * S0_ * exp(-q * timeToMaturity) * Nd1;
+            double term3 = - r * strike_ * exp(-r * timeToMaturity) * Nd2;
+            return (term1 + term2 + term3) / 365.0; // Convert to per day
         } 
-        else { // Put
-            // Theta for put
-            double term1 = - (S0_ * npd1 * volatility_) / (2.0 * sqrtTime);
-            double term2 = r * strike_ * std::exp(-r * timeToMaturity) * N_minus_d2;
-            return (term1 + term2) / 365.0; // Convert to per day
+        else {
+            double term1 = - (S0_ * npd1 * volatility_ * exp(-q * timeToMaturity)) / (2.0 * sqrtTime);
+            double term2 = - q * S0_ * exp(-q * timeToMaturity) * N_minus_d1;
+            double term3 = r * strike_ * exp(-r * timeToMaturity) * N_minus_d2;
+            return (term1 + term2 + term3) / 365.0; // Convert to per day
         }
     } 
-    else if (greek == "Vega") {return (S0_ * npd1 * sqrtTime) / 100.0;} // Per 1% change (Vega is the same for calls and puts) 
+    else if (greek == "Vega") {return (S0_ * exp(-q * timeToMaturity) * npd1 * sqrtTime) / 100.0;} // Per 1% change 
     else if (greek == "Rho") {
-        if (optionType_ == "Call") {
-            // Rho for call
-            return (strike_ * timeToMaturity * std::exp(-r * timeToMaturity) * Nd2) / 100.0; // Per 1% change
-        } 
-        else { // Put
-            // Rho for put
-            return (-strike_ * timeToMaturity * std::exp(-r * timeToMaturity) * N_minus_d2) / 100.0; // Per 1% change
-        }
+        if (optionType_ == "Call") {return (strike_ * timeToMaturity * exp(-r * timeToMaturity) * Nd2) / 100.0;} // Per 1% change 
+        else {return (-strike_ * timeToMaturity * exp(-r * timeToMaturity) * N_minus_d2) / 100.0;} // Per 1% change
     } 
-    else {
-        throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega, Rho.");
-    }
+    else {throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega and Rho.");}
 }
 
-// Method to numerically compute a greek that is provided as input
+// Method to compute a greek numerically
 double OptionPricer::computeGreekNumerical(const std::string greek) {
     // Finite difference increments
-    double h = 0.01;       // 1% change in spot price
+    double h = 0.01;             // 1% change in spot price
     double deltaT = 1.0 / 365.0; // One day change in maturity (in years)
-    double deltaVolatility = 0.01;    // 1% change in volatility
+    double deltaVolatility = 0.01; // 1% change in volatility
     double deltaR = 0.0001;      // 0.01% change in risk-free rate
 
     if (greek == "Delta") {
@@ -383,10 +381,11 @@ double OptionPricer::computeGreekNumerical(const std::string greek) {
         return (price_up - price_down) / (2 * deltaVolatility) / 100;
     } 
     else if (greek == "Rho") {
+        // Compute the price with increased and decreased risk-free rates
         double price_up = computePricePDE(S0_, maturity_, volatility_, deltaR);
         double price_down = computePricePDE(S0_, maturity_, volatility_, -deltaR);
         return (price_up - price_down) / (2 * deltaR) / 100; // Per 1% change
-    }
+    } 
     else {
         throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega, Rho.");
     }

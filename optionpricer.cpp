@@ -46,14 +46,10 @@ OptionPricer::OptionPricer(
     strike_ = option.getStrike();
     maturity_ = option.getMaturity();
     volatility_ = option.getVolatility();
-
 }
 
 // Method to interpolate risk free rates
 double OptionPricer::interpolateRiskFreeRate(double t, double deltaR) {
-    if (riskFreeTimes_.empty()) {
-        throw std::runtime_error("Risk-free times vector is empty.");
-    }
     if (t <= riskFreeTimes_.front()) {
         return riskFreeRates_.front() + deltaR;
     }
@@ -111,7 +107,7 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
         }
     }
 
-    // Boundary condition for S = 0 (lowest spot price)
+    // Boundary condition for S = 0
     for (int j = 0; j <= k_; ++j) {
         double t = timeSteps_[j];
         double r = interpolateRiskFreeRate(t, deltaR);
@@ -134,7 +130,6 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
     }
 }
 
-
 // This function is general to calls and puts
 void OptionPricer::performCalculations(double volatility, double deltaR) {
     // Time and spot step sizes (already computed in setupGrid)
@@ -150,9 +145,9 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
     for (int j = k_ - 1; j >= 0; --j) {
         // Set up the tridiagonal system
         int N = n_ - 1; // Number of interior spot points
-        std::vector<double> a(N, 0.0); // Lower diagonal (a_1 to a_N)
-        std::vector<double> b(N, 0.0); // Main diagonal (b_1 to b_N)
-        std::vector<double> c(N, 0.0); // Upper diagonal (c_1 to c_N)
+        std::vector<double> a(N, 0.0); // Lower diagonal
+        std::vector<double> b(N, 0.0); // Main diagonal
+        std::vector<double> c(N, 0.0); // Upper diagonal
         std::vector<double> d(N, 0.0); // Right-hand side
 
         double t = timeSteps_[j]; 
@@ -215,6 +210,7 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
 
 // Method to calculate the option price
 double OptionPricer::computePricePDE(double S0, double maturity, double volatility, double deltaR) {
+
     setupGrid(S0, maturity);
     initializeConditions(maturity, deltaR);
     performCalculations(volatility, deltaR);
@@ -232,7 +228,7 @@ double OptionPricer::computePricePDE(double S0, double maturity, double volatili
 
 // Function to compute the cumulative distribution function for the standard normal distribution
 double OptionPricer::normCDF(double x) const {
-    return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0))); // erf function comes from cmath
+    return 0.5 * (1.0 + std::erf(x / sqrt(2.0))); // erf function comes from cmath
 }
 
 double OptionPricer::computePriceBS() {
@@ -246,8 +242,8 @@ double OptionPricer::computePriceBS() {
     double q = dividendYield_;
 
     // Calculate d1 and d2
-    double d1 = (std::log(S0_ / strike_) + (r - q + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * std::sqrt(timeToMaturity));
-    double d2 = d1 - volatility_ * std::sqrt(timeToMaturity);
+    double d1 = (log(S0_ / strike_) + (r - q + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * sqrt(timeToMaturity));
+    double d2 = d1 - volatility_ * sqrt(timeToMaturity);
 
     // Calculate N(d1) and N(d2)
     double Nd1 = normCDF(d1);
@@ -292,7 +288,7 @@ void OptionPricer::comparePrices() {
 
 // Implementation of the standard normal PDF
 double OptionPricer::normPDF(double x) const {
-    return (1.0 / std::sqrt(2.0 * M_PI)) * std::exp(-0.5 * x * x);
+    return (1.0 / sqrt(2.0 * M_PI)) * exp(-0.5 * x * x);
 }
 
 // Method to analytically cally compute a greek that is provided as input (only valid for European options)
@@ -304,10 +300,10 @@ double OptionPricer::computeGreekBS(const std::string greek) {
     double timeToMaturity = maturity_ - T0_;
     double r = interpolateRiskFreeRate(T0_);
     double q = dividendYield_;
-    double sqrtTime = std::sqrt(timeToMaturity);
+    double sqrtTime = sqrt(timeToMaturity);
 
     // Calculate d1 and d2 with dividend yield
-    double d1 = (std::log(S0_ / strike_) + (r - q + 0.5 * volatility_ * volatility_) * timeToMaturity) /
+    double d1 = (log(S0_ / strike_) + (r - q + 0.5 * volatility_ * volatility_) * timeToMaturity) /
                 (volatility_ * sqrtTime);
     double d2 = d1 - volatility_ * sqrtTime;
 

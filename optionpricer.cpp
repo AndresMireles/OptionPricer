@@ -156,7 +156,7 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
         std::vector<double> d(N, 0.0); // Right-hand side
 
         double t = timeSteps_[j]; 
-        double r = interpolateRiskFreeRate(t, deltaR);; // Use risk-free rate at current time step (interpolating)
+        double r = interpolateRiskFreeRate(t, deltaR); // Use risk-free rate at current time step (interpolating)
 
         // Loop over interior spot indices
         for (int i = 1; i < n_; ++i) {

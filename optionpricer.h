@@ -73,7 +73,7 @@ private:
     double computePriceBS();
 
     // Method to calculate the option price using finite differences
-    double computePricePDE(double S0, double maturity, double volatility, double deltaR = 0.0);;
+    double computePricePDE(double S0, double maturity, double volatility, double deltaR = 0.0);
 
     // Method to analytically compute a greek that is provided as input (only valid for European options)
     double computeGreekBS(const std::string greek);

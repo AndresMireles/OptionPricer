@@ -102,7 +102,8 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
         double spot = spotPrices_[i];
         if (isCall) {
             grid_[i][k_] = std::max(spot - strike_, 0.0);
-        } else {
+        } 
+        else {
             grid_[i][k_] = std::max(strike_ - spot, 0.0);
         }
     }
@@ -112,8 +113,9 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
         double t = timeSteps_[j];
         double r = interpolateRiskFreeRate(t, deltaR);
         if (isCall) {
-            grid_[0][j] = 0.0;
-        } else {
+            grid_[0][j] = 0.0; // Call option is worthless
+        } 
+        else {
             grid_[0][j] = strike_ * exp(-r * (maturity - t));
         }
     }
@@ -124,8 +126,9 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
         double r = interpolateRiskFreeRate(t, deltaR);
         if (isCall) {
             grid_[n_][j] = spotPrices_[n_] * exp(-q * (maturity - t)) - strike_ * exp(-r * (maturity - t));
-        } else {
-            grid_[n_][j] = 0.0;
+        } 
+        else {
+            grid_[n_][j] = 0.0; // Call option is worthless
         }
     }
 }
@@ -199,7 +202,8 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
             if (isAmerican) {
                 // Apply early exercise condition for American options (whether it is worth it to execute now)
                 grid_[i][j] = std::max(x[i - 1], intrinsicValue);
-            } else {
+            }
+            else {
                 // For European options, use the computed value
                 grid_[i][j] = x[i - 1];
             }
@@ -215,14 +219,15 @@ double OptionPricer::computePricePDE(double S0, double maturity, double volatili
     initializeConditions(maturity, deltaR);
     performCalculations(volatility, deltaR);
 
-    int spot_index;
+    int spotIndex;
     if (n_ % 2 == 0) {
-        int lower_mid = n_ / 2 - 1;
-        int upper_mid = n_ / 2;
-        return (grid_[lower_mid][0] + grid_[upper_mid][0]) / 2.0;
-    } else {
-        spot_index = n_ / 2;
-        return grid_[spot_index][0];
+        int lowerMid = n_ / 2 - 1;
+        int upperMid = n_ / 2;
+        return (grid_[lowerMid][0] + grid_[upperMid][0]) / 2.0;
+    } 
+    else {
+        spotIndex = n_ / 2;
+        return grid_[spotIndex][0];
     }
 }
 
@@ -278,12 +283,12 @@ double OptionPricer::computePrice(const std::string method) {
 
 // Function to print the comparison of prices
 void OptionPricer::comparePrices() {
-    double PDE_price = computePricePDE(S0_, maturity_, volatility_);
-    double BS_price = computePriceBS();
+    double PDEPrice = computePricePDE(S0_, maturity_, volatility_);
+    double BSPrice = computePriceBS();
 
-    double PDE_error = PDE_price - BS_price;
+    double PDEError = PDEPrice - BSPrice;
 
-    std::cout << "Black-Scholes price: " << BS_price << ". PDE Price: " << PDE_price << ". PDE Error: " << PDE_error << ". PDE Relative Error: " << std::abs(PDE_error / BS_price) * 100 << "%." << std::endl;
+    std::cout << "Black-Scholes price: " << BSPrice << ". PDE Price: " << PDEPrice << ". PDE Error: " << PDEError << ". PDE Relative Error: " << std::abs(PDEError / BSPrice) * 100 << "%." << std::endl;
 }
 
 // Implementation of the standard normal PDF
@@ -343,7 +348,7 @@ double OptionPricer::computeGreekBS(const std::string greek) {
 }
 
 // Method to compute a greek numerically
-double OptionPricer::computeGreekNumerical(const std::string greek) {
+double OptionPricer::computeGreekNumerical(const std::string greek, double S0, double maturity, double volatility) {
     // Finite difference increments
     double h = 0.01;             // 1% change in spot price
     double deltaT = 1.0 / 365.0; // One day change in maturity (in years)
@@ -351,36 +356,36 @@ double OptionPricer::computeGreekNumerical(const std::string greek) {
     double deltaR = 0.0001;      // 0.01% change in risk-free rate
 
     if (greek == "Delta") {
-        double price_up = computePricePDE(S0_ * (1 + h), maturity_, volatility_);
-        double price_down = computePricePDE(S0_ * (1 - h), maturity_, volatility_);
-        return (price_up - price_down) / (2 * S0_ * h);
+        double priceUp = computePricePDE(S0 * (1 + h), maturity, volatility);
+        double priceDown = computePricePDE(S0 * (1 - h), maturity, volatility);
+        return (priceUp - priceDown) / (2 * S0 * h);
     } 
     else if (greek == "Gamma") {
-        double price_up = computePricePDE(S0_ * (1 + h), maturity_, volatility_);
-        double price_mid = computePricePDE(S0_, maturity_, volatility_);
-        double price_down = computePricePDE(S0_ * (1 - h), maturity_, volatility_);
-        return (price_up - 2 * price_mid + price_down) / ((S0_ * h) * (S0_ * h));
+        double priceUp = computePricePDE(S0 * (1 + h), maturity, volatility);
+        double price_mid = computePricePDE(S0, maturity, volatility);
+        double priceDown = computePricePDE(S0 * (1 - h), maturity, volatility);
+        return (priceUp - 2 * price_mid + priceDown) / ((S0 * h) * (S0 * h));
     } 
     else if (greek == "Theta") {
         // Ensure time to maturity remains positive
-        double T_up = maturity_ - deltaT;
+        double T_up = maturity - deltaT;
         if (T_up <= T0_) {
             throw std::logic_error("Delta T is too large, time to maturity becomes negative.");
         }
-        double price_now = computePricePDE(S0_, maturity_, volatility_);
-        double price_later = computePricePDE(S0_, T_up, volatility_);
+        double price_now = computePricePDE(S0, maturity, volatility);
+        double price_later = computePricePDE(S0, T_up, volatility);
         return (price_later - price_now) / deltaT / 365.0; // Negative value as time decreases
     } 
     else if (greek == "Vega") {
-        double price_up = computePricePDE(S0_, maturity_, volatility_ + deltaVolatility);
-        double price_down = computePricePDE(S0_, maturity_, volatility_ - deltaVolatility);
-        return (price_up - price_down) / (2 * deltaVolatility) / 100;
+        double priceUp = computePricePDE(S0, maturity, volatility + deltaVolatility);
+        double priceDown = computePricePDE(S0, maturity, volatility - deltaVolatility);
+        return (priceUp - priceDown) / (2 * deltaVolatility) / 100;
     } 
     else if (greek == "Rho") {
         // Compute the price with increased and decreased risk-free rates
-        double price_up = computePricePDE(S0_, maturity_, volatility_, deltaR);
-        double price_down = computePricePDE(S0_, maturity_, volatility_, -deltaR);
-        return (price_up - price_down) / (2 * deltaR) / 100; // Per 1% change
+        double priceUp = computePricePDE(S0, maturity, volatility, deltaR);
+        double priceDown = computePricePDE(S0, maturity, volatility, -deltaR);
+        return (priceUp - priceDown) / (2 * deltaR) / 100; // Per 1% change
     } 
     else {
         throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega, Rho.");
@@ -394,7 +399,7 @@ double OptionPricer::computeGreek(const std::string greek, const std::string met
         return computeGreekBS(greek);
     }
     else if (method == "Numerical") {
-        return computeGreekNumerical(greek);
+        return computeGreekNumerical(greek, S0_, maturity_, volatility_);
     }
     else {
         throw std::invalid_argument("Method for computing option greek must be either 'Black-Scholes' or 'Numerical'.");
@@ -403,12 +408,61 @@ double OptionPricer::computeGreek(const std::string greek, const std::string met
 
 // Function to print the comparison of prices
 void OptionPricer::compareGreeks(std::string greek) {
-    double numerical_greek = computeGreekNumerical(greek);
-    double BS_greek = computeGreekBS(greek);
+    double numericalGreek = computeGreekNumerical(greek, S0_, maturity_, volatility_);
+    double BSGreek = computeGreekBS(greek);
 
-    double numerical_error = numerical_greek - BS_greek;
+    double numericalError = numericalGreek - BSGreek;
 
-    std::cout << "Black-Scholes " << greek << ": " << BS_greek << ". Finite-Differences " << greek << ": " << numerical_greek << ". Numerical Error: " << numerical_error << ". Numerical Relative Error: " << std::abs(numerical_error / BS_greek) * 100 << "%." << std::endl;
+    std::cout << "Black-Scholes " << greek << ": " << BSGreek << ". Finite-Differences " << greek << ": " << numericalGreek << ". Numerical Error: " << numericalError << ". Numerical Relative Error: " << std::abs(numericalError / BSGreek) * 100 << "%." << std::endl;
 }
+
+// Method to compute PDE prices for a range of values
+std::vector<double> OptionPricer::computePricesVector(const std::string param, const std::vector<double> paramRange) {    
+    if (param != "Spot" && param != "Maturity" && param != "Volatility") {
+        throw std::invalid_argument("Param name should be 'Spot', 'Maturity' or 'Volatility'");
+    }
+
+    std::vector<double> prices(paramRange.size());
+
+    for (unsigned int i = 0; i < paramRange.size(); i++) {
+        double v = paramRange[i];
+        if (param == "Spot") {
+            prices[i] = computePricePDE(v, maturity_, volatility_);
+        }
+        else if (param == "Maturity") {
+            prices[i] = computePricePDE(S0_, v, volatility_);
+        }
+        else if (param == "Volatility") {
+            prices[i] = computePricePDE(S0_, maturity_, v);
+        }
+    }
+
+    return prices;
+}
+
+// Method to compute PDE greeks for a range of values
+std::vector<double> OptionPricer::computeGreeksVector(const std::string greek, const std::string param, const std::vector<double> paramRange) {
+    if (param != "Spot" && param != "Maturity" && param != "Volatility") {
+        throw std::invalid_argument("Param name should be 'Spot', 'Maturity' or 'Volatility'");
+    }
+
+    std::vector<double> greeks(paramRange.size());
+
+    for (unsigned int i = 0; i < paramRange.size(); i++) {
+        double v = paramRange[i];
+        if (param == "Spot") {
+            greeks[i] = computeGreekNumerical(greek, v, maturity_, volatility_);
+        }
+        else if (param == "Maturity") {
+            greeks[i] = computeGreekNumerical(greek, S0_, v, volatility_);
+        }
+        else if (param == "Volatility") {
+            greeks[i] = computeGreekNumerical(greek, S0_, maturity_, v);
+        }
+    }
+
+    return greeks;
+}
+
 
 } // namespace project

@@ -32,6 +32,10 @@ public:
     // Method to compare analytical and numerical greeks
     void compareGreeks(const std::string greek);
 
+    // Methods to compute PDE prices and greeks for a range of values
+    std::vector<double> computePricesVector(const std::string param, const std::vector<double> paramRange);
+    std::vector<double> computeGreeksVector(const std::string greek, const std::string param, const std::vector<double> paramRange);
+
 private:
     int n_; // Number of spot intervals
     int k_; // Number of time intervals
@@ -75,7 +79,7 @@ private:
     double computeGreekBS(const std::string greek);
 
     // Method to numerically compute a greek that is provided as input
-    double computeGreekNumerical(const std::string greek);
+    double computeGreekNumerical(const std::string greek, double S0, double maturity, double volatility);
 
 };
 

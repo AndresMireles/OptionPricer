@@ -2,3 +2,5 @@ projet20242025_en.pdf
 *.exe
 .vscode
 TODO.md
+Doxyfile
+/docs

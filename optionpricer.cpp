@@ -3,6 +3,8 @@
 
 namespace project {
 
+const double DAYS_IN_A_YEAR = 365.0;
+
 // Constructor
 OptionPricer::OptionPricer(
     Option option,
@@ -330,13 +332,13 @@ double OptionPricer::computeGreekBS(const std::string greek) {
             double term1 = - (S0_ * npd1 * volatility_ * exp(-q * timeToMaturity)) / (2.0 * sqrtTime);
             double term2 = q * S0_ * exp(-q * timeToMaturity) * Nd1;
             double term3 = - r * strike_ * exp(-r * timeToMaturity) * Nd2;
-            return (term1 + term2 + term3) / 365.0; // Convert to per day
+            return (term1 + term2 + term3) / DAYS_IN_A_YEAR; // Convert to per day
         } 
         else {
             double term1 = - (S0_ * npd1 * volatility_ * exp(-q * timeToMaturity)) / (2.0 * sqrtTime);
             double term2 = - q * S0_ * exp(-q * timeToMaturity) * N_minus_d1;
             double term3 = r * strike_ * exp(-r * timeToMaturity) * N_minus_d2;
-            return (term1 + term2 + term3) / 365.0; // Convert to per day
+            return (term1 + term2 + term3) / DAYS_IN_A_YEAR; // Convert to per day
         }
     } 
     else if (greek == "Vega") {return (S0_ * exp(-q * timeToMaturity) * npd1 * sqrtTime) / 100.0;} // Per 1% change 
@@ -350,10 +352,10 @@ double OptionPricer::computeGreekBS(const std::string greek) {
 // Method to compute a greek numerically
 double OptionPricer::computeGreekNumerical(const std::string greek, double S0, double maturity, double volatility) {
     // Finite difference increments
-    double h = 0.01;             // 1% change in spot price
-    double deltaT = 1.0 / 365.0; // One day change in maturity (in years)
+    double h = 0.01; // 1% change in spot price
+    double deltaT = 1.0 / DAYS_IN_A_YEAR; // One day change in maturity (in years)
     double deltaVolatility = 0.01; // 1% change in volatility
-    double deltaR = 0.0001;      // 0.01% change in risk-free rate
+    double deltaR = 0.0001; // 0.01% change in risk-free rate
 
     if (greek == "Delta") {
         double priceUp = computePricePDE(S0 * (1 + h), maturity, volatility);
@@ -374,7 +376,7 @@ double OptionPricer::computeGreekNumerical(const std::string greek, double S0, d
         }
         double price_now = computePricePDE(S0, maturity, volatility);
         double price_later = computePricePDE(S0, T_up, volatility);
-        return (price_later - price_now) / deltaT / 365.0; // Negative value as time decreases
+        return (price_later - price_now) / deltaT / DAYS_IN_A_YEAR; // Negative value as time decreases
     } 
     else if (greek == "Vega") {
         double priceUp = computePricePDE(S0, maturity, volatility + deltaVolatility);

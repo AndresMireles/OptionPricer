@@ -17,7 +17,7 @@ public:
         std::vector<double> riskFreeTimes,
         std::vector<double> riskFreeRates,
         double dividendYield,
-        double T0 = 0
+        double T0 = 0 // Pricing date (in years)
     );
 
     // Method to compute the price using the method provided as input

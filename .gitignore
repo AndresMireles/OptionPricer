@@ -4,3 +4,5 @@ projet20242025_en.pdf
 TODO.md
 Doxyfile
 /docs
+*.csv
+*.py

@@ -36,13 +36,15 @@ int main() {
 
     std::cout << "European price: " << pricer.computePrice("PDE") << ". American Price: " << pricerAm.computePrice("PDE") << "." << std::endl;
 
-    pricer.comparePrices();
+    pricerAm.saveExerciseBoundaryToFile("exercise_boundary.csv");
 
-    pricer.compareGreeks("Delta");
-    pricer.compareGreeks("Gamma");
-    pricer.compareGreeks("Theta");
-    pricer.compareGreeks("Vega");
-    pricer.compareGreeks("Rho");    
+    // pricer.comparePrices();
+
+    // pricer.compareGreeks("Delta");
+    // pricer.compareGreeks("Gamma");
+    // pricer.compareGreeks("Theta");
+    // pricer.compareGreeks("Vega");
+    // pricer.compareGreeks("Rho");    
     
 
     return 0;

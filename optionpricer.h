@@ -101,18 +101,18 @@ public:
     std::vector<double> computeGreeksVector(const std::string greek, const std::string param, const std::vector<double> paramRange);
 
     /**
-     * @brief Interpolates the risk-free rate at a given time.
+     * @brief Computes the exercise boundary for an American option.
      *
-     * Performs linear interpolation between specified risk-free rates based on the input time `t`.
-     * An optional adjustment `deltaR` can be added to the interpolated rate.
-     *
-     * @param t The time at which to interpolate the risk-free rate.
-     * @param deltaR An optional adjustment to the interpolated rate (default is 0.0).
-     * @return The interpolated risk-free rate.
-     *
-     * @throws std::runtime_error if the interpolation cannot be performed.
+     * @return A vector of pairs (time, asset price) representing the exercise boundary.
      */
-    double interpolateRiskFreeRate(double t, double deltaR = 0.0);
+    std::vector<std::pair<double, double>> computeExerciseBoundary();
+
+    /**
+     * @brief Saves the exercise boundary data to a CSV file.
+     *
+     * @param filename The name of the file to save the data.
+     */
+    void saveExerciseBoundaryToFile(const std::string& filename);
 
 private:
     // Member variables with brief descriptions

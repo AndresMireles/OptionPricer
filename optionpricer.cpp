@@ -1,6 +1,6 @@
 #include "OptionPricer.h"
 #include <cmath>
-
+#include <fstream>
 namespace project {
 
 const double DAYS_IN_A_YEAR = 365.0;
@@ -464,6 +464,71 @@ std::vector<double> OptionPricer::computeGreeksVector(const std::string greek, c
     }
 
     return greeks;
+}
+
+std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
+    std::vector<std::pair<double, double>> exerciseBoundary;
+    double tolerance = 1e-6; // Tolerance for floating-point comparison
+
+    // Ensure the grid has been computed
+    if (grid_.empty()) {
+        throw std::runtime_error("Option grid not computed. Please run computePrice('PDE') first.");
+    }
+
+    // Loop over time steps
+    for (int j = 0; j <= k_; ++j) {
+        double timeToMaturity = maturity_ - timeSteps_[j];
+        double boundaryPrice = -1.0;
+
+        // For an American Put Option
+        if (optionType_ == "Put" && exerciseType_ == "American") {
+            // Loop over spot prices
+            for (int i = 0; i <= n_; ++i) {
+                double spotPrice = spotPrices_[i];
+                double optionValue = grid_[i][j];
+                double payoff = std::max(strike_ - spotPrice, 0.0);
+
+                // Check if the option value equals the payoff within tolerance
+                if (std::abs(optionValue - payoff) < tolerance) {
+                    boundaryPrice = spotPrice;
+                    break; // Found the boundary
+                }
+            }
+        }
+        // For an American Call Option
+        else if (optionType_ == "Call" && exerciseType_ == "American") {
+            // Loop over spot prices in reverse
+            for (int i = n_; i >= 0; --i) {
+                double spotPrice = spotPrices_[i];
+                double optionValue = grid_[i][j];
+                double payoff = std::max(spotPrice - strike_, 0.0);
+
+                if (std::abs(optionValue - payoff) < tolerance) {
+                    boundaryPrice = spotPrice;
+                    break;
+                }
+            }
+        }
+
+        // If boundary price was found, add it to the vector
+        if (boundaryPrice >= 0.0) {
+            exerciseBoundary.push_back(std::make_pair(timeToMaturity, boundaryPrice / strike_));
+        }
+    }
+
+    return exerciseBoundary;
+}
+
+void OptionPricer::saveExerciseBoundaryToFile(const std::string& filename) {
+    auto boundary = computeExerciseBoundary();
+    std::ofstream file(filename);
+    if (file.is_open()) {
+        file << "TimeToMaturity,AssetPriceOverStrike\n";
+        for (const auto& point : boundary) {
+            file << point.first << "," << point.second << "\n";
+        }
+        file.close();
+    }
 }
 
 

@@ -59,7 +59,7 @@ double OptionPricer::interpolateRiskFreeRate(double t, double deltaR) {
         return riskFreeRates_.back() + deltaR;
     }
     // Linear interpolation
-    for (size_t i = 0; i < riskFreeTimes_.size() - 1; ++i) {
+    for (size_t i = 0; i < riskFreeTimes_.size() - 1; i++) {
         if (t >= riskFreeTimes_[i] && t <= riskFreeTimes_[i + 1]) {
             double t1 = riskFreeTimes_[i];
             double t2 = riskFreeTimes_[i + 1];
@@ -83,13 +83,13 @@ void OptionPricer::setupGrid(double S0, double maturity) {
 
     // Populate spot prices for each step
     spotPrices_.resize(n_ + 1);
-    for (int i = 0; i <= n_; ++i) {
+    for (int i = 0; i <= n_; i++) {
         spotPrices_[i] = i * dS; // Spot prices for each grid row
     }
 
     // Populate time steps for each time interval
     timeSteps_.resize(k_ + 1);
-    for (int j = 0; j <= k_; ++j) {
+    for (int j = 0; j <= k_; j++) {
         timeSteps_[j] = T0_ + j * dt; // Time steps for each column in the grid
     }
 }
@@ -100,7 +100,7 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
     double q = dividendYield_;
 
     // Initial condition at maturity (t = T)
-    for (int i = 0; i <= n_; ++i) {
+    for (int i = 0; i <= n_; i++) {
         double spot = spotPrices_[i];
         if (isCall) {
             grid_[i][k_] = std::max(spot - strike_, 0.0);
@@ -111,7 +111,7 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
     }
 
     // Boundary condition for S = 0
-    for (int j = 0; j <= k_; ++j) {
+    for (int j = 0; j <= k_; j++) {
         double t = timeSteps_[j];
         double r = interpolateRiskFreeRate(t, deltaR);
         if (isCall) {
@@ -123,14 +123,14 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
     }
 
     // Boundary condition for very high S (highest spot price)
-    for (int j = 0; j <= k_; ++j) {
+    for (int j = 0; j <= k_; j++) {
         double t = timeSteps_[j];
         double r = interpolateRiskFreeRate(t, deltaR);
         if (isCall) {
             grid_[n_][j] = spotPrices_[n_] * exp(-q * (maturity - t)) - strike_ * exp(-r * (maturity - t));
         } 
         else {
-            grid_[n_][j] = 0.0; // Put option is worthless
+            grid_[n_][j] = 0.0; // Call option is worthless
         }
     }
 }
@@ -159,7 +159,7 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
         double r = interpolateRiskFreeRate(t, deltaR); // Use risk-free rate at current time step (interpolating)
 
         // Loop over interior spot indices
-        for (int i = 1; i < n_; ++i) {
+        for (int i = 1; i < n_; i++) {
             double S = spotPrices_[i];
 
             // Coefficients for the implicit method
@@ -183,7 +183,7 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
 
         // Thomas algorithm for solving tridiagonal systems
         // Forward elimination
-        for (int i = 1; i < N; ++i) {
+        for (int i = 1; i < N; i++) {
             double m = a[i] / b[i - 1];
             b[i] -= m * c[i - 1];
             d[i] -= m * d[i - 1];
@@ -197,7 +197,7 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
         }
 
         // Update grid values for current time step
-        for (int i = 1; i < n_; ++i) {
+        for (int i = 1; i < n_; i++) {
             double S = spotPrices_[i];
             double intrinsicValue = isCall ? std::max(S - strike_, 0.0) : std::max(strike_ - S, 0.0);
 
@@ -474,15 +474,20 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
     std::vector<std::pair<double, double>> exerciseBoundary;
     double tolerance = 1e-6; // Tolerance for floating-point comparison
 
+    // Ensure the grid has been computed
+    if (grid_.empty()) {
+        throw std::runtime_error("Option grid not computed. Please run computePrice('PDE') first.");
+    }
+
     // Loop over time steps
-    for (int j = 0; j <= k_; ++j) {
+    for (int j = 0; j <= k_; j++) {
         double timeToMaturity = maturity_ - timeSteps_[j];
         double boundaryPrice = -1.0;
 
         // For an American Put Option
         if (optionType_ == "Put" && exerciseType_ == "American") {
             // Loop over spot prices
-            for (int i = 0; i <= n_; ++i) {
+            for (int i = 0; i <= n_; i++) {
                 double spotPrice = spotPrices_[i];
                 double optionValue = grid_[i][j];
                 double payoff = std::max(strike_ - spotPrice, 0.0);

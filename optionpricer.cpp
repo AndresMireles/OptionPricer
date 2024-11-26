@@ -72,7 +72,7 @@ double OptionPricer::interpolateRiskFreeRate(double t, double deltaR) {
     throw std::runtime_error("Failed to interpolate risk-free rate.");
 }
 
-// The method for setting up the grid
+// The method for setting up the grid of prices
 void OptionPricer::setupGrid(double S0, double maturity) {
     // Set up the grid with n_ + 1 rows and k_ + 1 columns, and fill it with 0
     grid_.resize(n_ + 1, std::vector<double>(k_ + 1, 0.0));
@@ -130,7 +130,7 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
             grid_[n_][j] = spotPrices_[n_] * exp(-q * (maturity - t)) - strike_ * exp(-r * (maturity - t));
         } 
         else {
-            grid_[n_][j] = 0.0; // Call option is worthless
+            grid_[n_][j] = 0.0; // Put option is worthless
         }
     }
 }
@@ -467,13 +467,12 @@ std::vector<double> OptionPricer::computeGreeksVector(const std::string greek, c
 }
 
 std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
+
+    // We compute the price using the parameters of the pricer (to avoid errors if other methods are executed that modify the grid)
+    computePricePDE(S0_, maturity_, volatility_);
+
     std::vector<std::pair<double, double>> exerciseBoundary;
     double tolerance = 1e-6; // Tolerance for floating-point comparison
-
-    // Ensure the grid has been computed
-    if (grid_.empty()) {
-        throw std::runtime_error("Option grid not computed. Please run computePrice('PDE') first.");
-    }
 
     // Loop over time steps
     for (int j = 0; j <= k_; ++j) {

@@ -25,7 +25,7 @@ int main() {
     int k = 1000; // Number of time steps
     double S0 = 120;
     std::vector<double> riskFreeTimes = {0.0, 0.5, 1.0};
-    std::vector<double> riskFreeRates = {0.1, 0.05, 0.07};
+    std::vector<double> riskFreeRates = {0.1, 0.1, 0.1};
     double q = 0.01;
     double T0 = 0.0;
 
@@ -36,9 +36,9 @@ int main() {
 
     std::cout << "European price: " << pricer.computePrice("PDE") << ". American Price: " << pricerAm.computePrice("PDE") << "." << std::endl;
 
-    pricerAm.saveExerciseBoundaryToFile("exercise_boundary.csv");
+    // pricerAm.saveExerciseBoundaryToFile("exercise_boundary.csv");
 
-    // pricer.comparePrices();
+    pricer.comparePrices();
 
     // pricer.compareGreeks("Delta");
     // pricer.compareGreeks("Gamma");

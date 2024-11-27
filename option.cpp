@@ -1,5 +1,3 @@
-// option.cpp
-
 #include "option.h"
 #include <string>
 #include <stdexcept>

@@ -7,12 +7,12 @@ const double DAYS_IN_A_YEAR = 365.0;
 
 // Constructor
 OptionPricer::OptionPricer(
-    Option option,
+    Option& option,
     int n,
     int k,
     double S0,
-    std::vector<double> riskFreeTimes,
-    std::vector<double> riskFreeRates,
+    std::vector<double>& riskFreeTimes,
+    std::vector<double>& riskFreeRates,
     double dividendYield,
     double T0
 ) {
@@ -407,7 +407,7 @@ void OptionPricer::compareGreeks(std::string greek) {
 }
 
 // Method to compute PDE prices for a range of values
-std::vector<double> OptionPricer::computePricesVector(const std::string param, const std::vector<double> paramRange) {    
+std::vector<double> OptionPricer::computePricesVector(const std::string param, const std::vector<double>& paramRange) {    
     if (param != "Spot" && param != "Maturity" && param != "Volatility") {
         throw std::invalid_argument("Param name should be 'Spot', 'Maturity' or 'Volatility'");
     }
@@ -431,7 +431,7 @@ std::vector<double> OptionPricer::computePricesVector(const std::string param, c
 }
 
 // Method to compute PDE greeks for a range of values
-std::vector<double> OptionPricer::computeGreeksVector(const std::string greek, const std::string param, const std::vector<double> paramRange) {
+std::vector<double> OptionPricer::computeGreeksVector(const std::string greek, const std::string param, const std::vector<double>& paramRange) {
     if (param != "Spot" && param != "Maturity" && param != "Volatility") {
         throw std::invalid_argument("Param name should be 'Spot', 'Maturity' or 'Volatility'");
     }

@@ -32,12 +32,12 @@ public:
      * @throws std::invalid_argument if any of the input parameters are invalid.
      */
     OptionPricer(
-        Option option,
+        Option& option,
         int n, // Number of spot steps
         int k, // Number of time steps
         double S0,
-        std::vector<double> riskFreeTimes,
-        std::vector<double> riskFreeRates,
+        std::vector<double>& riskFreeTimes,
+        std::vector<double>& riskFreeRates,
         double dividendYield,
         double T0 = 0 // Pricing date (in years)
     );
@@ -86,7 +86,7 @@ public:
      *
      * @throws std::invalid_argument if an invalid parameter name is provided.
      */
-    std::vector<double> computePricesVector(const std::string param, const std::vector<double> paramRange);
+    std::vector<double> computePricesVector(const std::string param, const std::vector<double>& paramRange);
 
     /**
      * @brief Computes option Greeks over a range of parameter values.
@@ -98,7 +98,7 @@ public:
      *
      * @throws std::invalid_argument if an invalid parameter or Greek name is provided.
      */
-    std::vector<double> computeGreeksVector(const std::string greek, const std::string param, const std::vector<double> paramRange);
+    std::vector<double> computeGreeksVector(const std::string greek, const std::string param, const std::vector<double>& paramRange);
 
     /**
      * @brief Computes the exercise boundary for an American option.

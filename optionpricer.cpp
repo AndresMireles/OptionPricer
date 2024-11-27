@@ -59,7 +59,7 @@ double OptionPricer::interpolateRiskFreeRate(double t, double deltaR) {
         return riskFreeRates_.back() + deltaR;
     }
     // Linear interpolation
-    for (size_t i = 0; i < riskFreeTimes_.size() - 1; i++) {
+    for (unsigned int i = 0; i < riskFreeTimes_.size() - 1; i++) {
         if (t >= riskFreeTimes_[i] && t <= riskFreeTimes_[i + 1]) {
             double t1 = riskFreeTimes_[i];
             double t2 = riskFreeTimes_[i + 1];
@@ -158,13 +158,13 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
         double t = timeSteps_[j]; 
         double r = interpolateRiskFreeRate(t, deltaR); // Use risk-free rate at current time step (interpolating)
 
-        // Loop over interior spot indices
+        // Loop over interior spot indices for filling the matrix components
         for (int i = 1; i < n_; i++) {
             double S = spotPrices_[i];
 
             // Coefficients for the implicit method
             double alpha = 0.5 * volatility * volatility * S * S / (dS * dS);
-            double beta = (r - q) * S / (2.0 * dS);
+            double beta = 0.5 * (r - q) * S / dS;
             double gamma = r;
 
             a[i - 1] = -dt * (alpha - beta);
@@ -181,20 +181,8 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
         // Right boundary adjustment
         d[N - 1] -= c[N - 1] * grid_[n_][j];
 
-        // Thomas algorithm for solving tridiagonal systems
-        // Forward elimination
-        for (int i = 1; i < N; i++) {
-            double m = a[i] / b[i - 1];
-            b[i] -= m * c[i - 1];
-            d[i] -= m * d[i - 1];
-        }
-
-        // Back substitution
-        std::vector<double> x(N, 0.0); // Solution vector
-        x[N - 1] = d[N - 1] / b[N - 1];
-        for (int i = N - 2; i >= 0; --i) {
-            x[i] = (d[i] - c[i] * x[i + 1]) / b[i];
-        }
+        // Use our function to solve the tridiagional system using the Thomas Algorithm
+        std::vector<double> x = solveTridiagThomas(a, b, c, d);
 
         // Update grid values for current time step
         for (int i = 1; i < n_; i++) {
@@ -221,15 +209,13 @@ double OptionPricer::computePricePDE(double S0, double maturity, double volatili
     initializeConditions(maturity, deltaR);
     performCalculations(volatility, deltaR);
 
-    int spotIndex;
     if (n_ % 2 == 0) {
         int lowerMid = n_ / 2 - 1;
         int upperMid = n_ / 2;
         return (grid_[lowerMid][0] + grid_[upperMid][0]) / 2.0;
     } 
     else {
-        spotIndex = n_ / 2;
-        return grid_[spotIndex][0];
+        return grid_[n_ / 2][0];
     }
 }
 
@@ -346,7 +332,9 @@ double OptionPricer::computeGreekBS(const std::string greek) {
         if (optionType_ == "Call") {return (strike_ * timeToMaturity * exp(-r * timeToMaturity) * Nd2) / 100.0;} // Per 1% change 
         else {return (-strike_ * timeToMaturity * exp(-r * timeToMaturity) * N_minus_d2) / 100.0;} // Per 1% change
     } 
-    else {throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega and Rho.");}
+    else {
+        throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega and Rho.");
+    }
 }
 
 // Method to compute a greek numerically
@@ -514,7 +502,7 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
             }
         }
 
-        // If boundary price was found, add it to the vector
+        // If boundary price was found, add it to the vector (we add the relative price so that the boundary plot doesn't depend on it)
         if (boundaryPrice >= 0.0) {
             exerciseBoundary.push_back(std::make_pair(timeToMaturity, boundaryPrice / strike_));
         }
@@ -533,6 +521,36 @@ void OptionPricer::saveExerciseBoundaryToFile(const std::string& filename) {
         }
         file.close();
     }
+}
+
+// Function to solve a tridiagonal system using the Thomas algorithm
+std::vector<double> OptionPricer::solveTridiagThomas(
+    const std::vector<double>& a, 
+    const std::vector<double>& b, 
+    const std::vector<double>& c, 
+    std::vector<double> d
+) {
+    int N = b.size();
+
+    // Vectors for modified coefficients
+    std::vector<double> b_mod(b); // Copy of the main diagonal
+    std::vector<double> d_mod(d); // Copy of the right-hand side
+
+    // Forward elimination
+    for (int i = 1; i < N; i++) {
+        double m = a[i] / b_mod[i - 1];
+        b_mod[i] -= m * c[i - 1];
+        d_mod[i] -= m * d_mod[i - 1];
+    }
+
+    // Back substitution
+    std::vector<double> x(N, 0.0); // Solution vector
+    x[N - 1] = d_mod[N - 1] / b_mod[N - 1];
+    for (int i = N - 2; i >= 0; --i) {
+        x[i] = (d_mod[i] - c[i] * x[i + 1]) / b_mod[i];
+    }
+
+    return x;
 }
 
 

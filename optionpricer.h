@@ -156,6 +156,15 @@ private:
     // Greek computations
     double computeGreekBS(const std::string greek); ///< Computes Greek analytically using Black-Scholes
     double computeGreekNumerical(const std::string greek, double S0, double maturity, double volatility); ///< Computes Greek numerically using finite differences
+
+    // Function to solve a tridiagonal system using the Thomas algorithm
+    std::vector<double> solveTridiagThomas(
+        const std::vector<double>& a, // Lower diagonal
+        const std::vector<double>& b, // Main diagonal
+        const std::vector<double>& c, // Upper diagonal
+        std::vector<double> d // Right-hand side
+    );
+
 };
 
 } // namespace project

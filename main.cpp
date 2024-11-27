@@ -21,10 +21,10 @@ int main() {
     std::cout << optAm << std::endl;
 
     // Pricer parameters
-    int n = 100000; // Number of spot steps
-    int k = 1000; // Number of time steps
+    int n = 100000; // Number of spot steps (better to have this number higher, more precision with less computation time)
+    int k = 100; // Number of time steps
     double S0 = 120;
-    std::vector<double> riskFreeTimes = {0.0, 0.5, 1.0};
+    std::vector<double> riskFreeTimes = {0.0, 0.5, maturity};
     std::vector<double> riskFreeRates = {0.1, 0.1, 0.1};
     double q = 0.01;
     double T0 = 0.0;

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Option Pricing Library** is a C++ project designed to model and price financial options using both analytical and numerical methods. It provides a robust framework for representing financial options and calculating their prices and Greeks (sensitivities) using the Black-Scholes model and Partial Differential Equation (PDE)-based finite difference methods.
+The **Option Pricing Library** is a C++ project designed to model and price financial options using both analytical and numerical methods. It provides a framework for representing financial options and calculating their prices and Greeks (sensitivities) using the Black-Scholes model and Partial Differential Equation (PDE)-based finite difference methods.
 
 ## Features
 

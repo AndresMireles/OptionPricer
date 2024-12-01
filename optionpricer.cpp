@@ -314,14 +314,13 @@ double OptionPricer::computeGreekBS(const std::string greek) {
     } 
     else if (greek == "Gamma") {return (exp(-q * timeToMaturity) * npd1) / (S0_ * volatility_ * sqrtTime);} 
     else if (greek == "Theta") {
+        double term1 = - (S0_ * npd1 * volatility_ * exp(-q * timeToMaturity)) / (2.0 * sqrtTime);
         if (optionType_ == "Call") {
-            double term1 = - (S0_ * npd1 * volatility_ * exp(-q * timeToMaturity)) / (2.0 * sqrtTime);
             double term2 = q * S0_ * exp(-q * timeToMaturity) * Nd1;
             double term3 = - r * strike_ * exp(-r * timeToMaturity) * Nd2;
             return (term1 + term2 + term3) / DAYS_IN_A_YEAR; // Convert to per day
         } 
         else {
-            double term1 = - (S0_ * npd1 * volatility_ * exp(-q * timeToMaturity)) / (2.0 * sqrtTime);
             double term2 = - q * S0_ * exp(-q * timeToMaturity) * N_minus_d1;
             double term3 = r * strike_ * exp(-r * timeToMaturity) * N_minus_d2;
             return (term1 + term2 + term3) / DAYS_IN_A_YEAR; // Convert to per day

@@ -124,7 +124,7 @@ private:
     double dividendYield_; ///< Continuous dividend yield
     double T0_; ///< Initial computation time
     
-    double interpolateRiskFreeRate(double t, double deltaR = 0.0); // Method to interpolate the risk free rates
+    double interpolateRiskFreeRate(double t, double deltaR = 0.0); ///< Method to interpolate the risk free rates
 
     // Parameters of the option
     std::string optionType_; ///< Type of the option ("Call" or "Put")

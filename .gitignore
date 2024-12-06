@@ -6,3 +6,5 @@ Doxyfile
 /docs
 *.csv
 *.py
+main_good.cpp
+*.xlsm

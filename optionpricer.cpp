@@ -195,7 +195,7 @@ void OptionPricer::performCalculations(double volatility, double deltaR) {
             }
             else {
                 // For European options, use the computed value
-                grid_[i][j] = x[i - 1];
+                grid_[i][j] = std::max(x[i - 1], 0.0); // In theory not needed, but necessary for rounding error
             }
         }
         // The boundary values grid_[0][j] and grid_[n_][j] are already set
@@ -514,7 +514,7 @@ void OptionPricer::saveExerciseBoundaryToFile(const std::string& filename) {
     auto boundary = computeExerciseBoundary();
     std::ofstream file(filename);
     if (file.is_open()) {
-        file << "TimeToMaturity,AssetPriceOverStrike\n";
+        file << "Time To Maturity,Asset Price Over Strike\n";
         for (const auto& point : boundary) {
             file << point.first << "," << point.second << "\n";
         }

@@ -56,7 +56,7 @@ public:
         const std::string& optionType,
         const std::string& exerciseType,
         double strike,
-        double maturity,  // Maturity date (in years)
+        double maturity,
         double volatility
     );
 

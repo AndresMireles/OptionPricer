@@ -220,7 +220,7 @@ double OptionPricer::computePricePDE(double S0, double maturity, double volatili
 
     // Return the option price at S0 (we need to check where is it)
     auto it = std::min_element(spotPrices_.begin(), spotPrices_.end(),
-        [&](double a, double b) { return std::abs(a - S0) < std::abs(b - S0); });
+        [&](double a, double b) { return abs(a - S0) < abs(b - S0); });
     int index = std::distance(spotPrices_.begin(), it);
 
     // Return the option price at the identified index
@@ -505,8 +505,8 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
     }
 
     // Relative tolerance for near-equality detection
-    double relativeTolerance = 1e-4;
-    double priceTolerance = 1e-2;
+    double relativeTolerance = 1e-5;
+    double priceTolerance = 1e-3;
 
     for (int j = 0; j <= k_; j++) {
         double timeToMaturity = maturity_ - timeSteps_[j];
@@ -533,32 +533,77 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
 
             // For a put, boundary should be less or around strike. If boundaryPrice is absurd (e.g., at Smax), discard it.
             if (boundaryPrice > 0.0 && boundaryPrice <= (1.5 * strike_)) {
-                exerciseBoundary.emplace_back(std::make_pair(timeToMaturity, boundaryPrice));
+                exerciseBoundary.push_back(std::make_pair(timeToMaturity, boundaryPrice));
             }
 
         } 
         else if (optionType_ == "Call") {
+            // For calls (especially with q > 0), start from high S and move downward.
+            // We don't break at the first suitable node. Instead, we try to identify the transition.
+
+            bool initialSet = false;
+            bool inNearEqualityZone = false;
+            int lastGoodIndex = -1;
+
             for (int i = n_; i >= 0; --i) {
                 double S = spotPrices_[i];
                 double optionValue = grid_[i][j];
                 double payoff = std::max(S - strike_, 0.0);
-                double diff = optionValue - payoff;
-
                 double scale = (payoff > 1e-12) ? payoff : 1.0;
-                double relDiff = std::fabs(diff) / scale;
+                double diff = optionValue - payoff;
+                double relDiff = abs(diff) / scale;
 
-                if (relDiff < relativeTolerance && grid_[i][j] > priceTolerance && spotPrices_[i] > priceTolerance) {
-                    // Found a region near equality, candidate boundary and stop
-                    boundaryPrice = S;
-                    break;
+                if (!initialSet) {
+                    initialSet = true;
+                    // If we start at Smax and it's already near equality, record it
+                    if (relDiff < relativeTolerance) {
+                        inNearEqualityZone = true;
+                        lastGoodIndex = i;
+                    }
+                } 
+                else {
+                    // If previously in near equality and still in it, update lastGoodIndex
+                    if (inNearEqualityZone && relDiff < relativeTolerance) {
+                        lastGoodIndex = i;
+                    }
+                    // If we were in near equality zone and now relDiff > tolerance, we've found the break point
+                    else if (inNearEqualityZone && relDiff >= relativeTolerance) {
+                        // Interpolate between lastGoodIndex and i for more accurate boundary
+                        int highIndex = lastGoodIndex; // last good index in near-equality zone
+                        int lowIndex = i; // current index where we broke out of near equality
+
+                        double S_high = spotPrices_[highIndex];
+                        double S_low = spotPrices_[lowIndex];
+                        double f_high = abs((grid_[highIndex][j] - std::max(S_high - strike_,0.0))) / ((std::max(S_high - strike_,0.0)>1e-12)?std::max(S_high - strike_,0.0):1.0);
+                        double f_low = abs((grid_[lowIndex][j] - std::max(S_low - strike_,0.0))) / ((std::max(S_low - strike_,0.0)>1e-12)?std::max(S_low - strike_,0.0):1.0);
+
+                        // Avoid division by zero; we know f_low > relativeTolerance and f_high < relativeTolerance
+                        // We solve for boundary S in [S_low, S_high] (or [S_high, S_low], since we're going downward)
+                        // linear interpolation:
+                        double S_boundary = S_high - f_high * (S_low - S_high) / (f_low - f_high);
+
+                        boundaryPrice = S_boundary;
+                        break;
+                    }
+                    // If we haven't yet entered a near-equality zone but now meet condition, start zone
+                    else if (!inNearEqualityZone && relDiff < relativeTolerance) {
+                        inNearEqualityZone = true;
+                        lastGoodIndex = i;
+                    }
                 }
             }
 
-            // For calls with q>0, boundary should be large, but not absurdly at Smax. If boundary is at Smax, it's suspicious.
-            if (boundaryPrice > 0.0 && boundaryPrice < (1.9 * strike_)) {
-                exerciseBoundary.emplace_back(std::make_pair(timeToMaturity, boundaryPrice));
+            // If we never broke out of near-equality zone or never found it, check if we got something
+            if (boundaryPrice < 0.0) {
+                if (inNearEqualityZone && lastGoodIndex >= 0) {
+                    // We ended still in near equality zone. 
+                    std::cerr << "Warning: Boundary might lie beyond Smax. Consider increasing Smax.\n";
+                }
+            } 
+            else {
+                // We have a valid boundaryPrice
+                exerciseBoundary.push_back(std::make_pair(timeToMaturity, boundaryPrice));
             }
-
         }
     }
 

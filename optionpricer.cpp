@@ -220,7 +220,7 @@ double OptionPricer::computePricePDE(double S0, double maturity, double volatili
 
     // Return the option price at S0 (we need to check where is it)
     auto it = std::min_element(spotPrices_.begin(), spotPrices_.end(),
-        [&](double a, double b) { return abs(a - S0) < abs(b - S0); });
+        [&](double a, double b) { return std::abs(a - S0) < std::abs(b - S0); });
     int index = std::distance(spotPrices_.begin(), it);
 
     // Return the option price at the identified index
@@ -505,8 +505,8 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
     }
 
     // Relative tolerance for near-equality detection
-    double relativeTolerance = 1e-4;
-    double priceTolerance = 1e-2;
+    double relativeTolerance = 1e-5;
+    double priceTolerance = 1e-3;
 
     for (int j = 0; j <= k_; j++) {
         double timeToMaturity = maturity_ - timeSteps_[j];
@@ -551,7 +551,7 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
                 double payoff = std::max(S - strike_, 0.0);
                 double scale = (payoff > 1e-12) ? payoff : 1.0;
                 double diff = optionValue - payoff;
-                double relDiff = abs(diff) / scale;
+                double relDiff = std::fabs(diff) / scale;
 
                 if (!initialSet) {
                     initialSet = true;
@@ -574,8 +574,8 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
 
                         double S_high = spotPrices_[highIndex];
                         double S_low = spotPrices_[lowIndex];
-                        double f_high = abs((grid_[highIndex][j] - std::max(S_high - strike_,0.0))) / ((std::max(S_high - strike_,0.0)>1e-12)?std::max(S_high - strike_,0.0):1.0);
-                        double f_low = abs((grid_[lowIndex][j] - std::max(S_low - strike_,0.0))) / ((std::max(S_low - strike_,0.0)>1e-12)?std::max(S_low - strike_,0.0):1.0);
+                        double f_high = std::fabs((grid_[highIndex][j] - std::max(S_high - strike_,0.0))) / ((std::max(S_high - strike_,0.0)>1e-12)?std::max(S_high - strike_,0.0):1.0);
+                        double f_low = std::fabs((grid_[lowIndex][j] - std::max(S_low - strike_,0.0))) / ((std::max(S_low - strike_,0.0)>1e-12)?std::max(S_low - strike_,0.0):1.0);
 
                         // Avoid division by zero; we know f_low > relativeTolerance and f_high < relativeTolerance
                         // We solve for boundary S in [S_low, S_high] (or [S_high, S_low], since we're going downward)
@@ -596,11 +596,10 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
             // If we never broke out of near-equality zone or never found it, check if we got something
             if (boundaryPrice < 0.0) {
                 if (inNearEqualityZone && lastGoodIndex >= 0) {
-                    // We ended still in near equality zone. 
+                    // We ended still in near equality zone
                     std::cerr << "Warning: Boundary might lie beyond Smax. Consider increasing Smax.\n";
                 }
-            } 
-            else {
+            } else {
                 // We have a valid boundaryPrice
                 exerciseBoundary.push_back(std::make_pair(timeToMaturity, boundaryPrice));
             }

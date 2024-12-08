@@ -232,26 +232,32 @@ double OptionPricer::computePriceBS() {
     }
 
     double timeToMaturity = maturity_ - T0_;
-    double r = interpolateRiskFreeRate(timeToMaturity);
     double q = dividendYield_;
+    double sqrtT = sqrt(timeToMaturity);
 
-    // Calculate d1 and d2
-    double d1 = (log(S0_ / strike_) + (r - q + 0.5 * volatility_ * volatility_) * timeToMaturity) / (volatility_ * sqrt(timeToMaturity));
-    double d2 = d1 - volatility_ * sqrt(timeToMaturity);
+    // Compute the discount factor D = exp(-∫ r(t) dt from T0_ to maturity_)
+    double D = computeDiscountedStrike(1.0, T0_, maturity_);
 
-    // Calculate N(d1) and N(d2)
+    // Forward price under the term structure: F = S0 * exp(-q*T) / D
+    double F = S0_ * exp(-q * timeToMaturity) / D;
+
+    // Compute d1 and d2 using forward price
+    double d1 = (log(F / strike_) + 0.5 * volatility_ * volatility_ * timeToMaturity) / (volatility_ * sqrtT);
+    double d2 = d1 - volatility_ * sqrtT;
+
     double Nd1 = normCDF(d1);
     double Nd2 = normCDF(d2);
     double N_minus_d1 = normCDF(-d1);
     double N_minus_d2 = normCDF(-d2);
 
-    // Compute option price based on type
     double price;
     if (optionType_ == "Call") {
-        price = S0_ * exp(-q * timeToMaturity) * Nd1 - strike_ * exp(-r * timeToMaturity) * Nd2;
+        // Call = D * [F * N(d1) - K * N(d2)]
+        price = D * (F * Nd1 - strike_ * Nd2);
     } 
-    else { // Put
-        price = strike_ * exp(-r * timeToMaturity) * N_minus_d2 - S0_ * exp(-q * timeToMaturity) * N_minus_d1;
+    else {
+        // Put = D * [K * N(-d2) - F * N(-d1)]
+        price = D * (strike_ * N_minus_d2 - F * N_minus_d1);
     }
 
     return price;
@@ -292,48 +298,64 @@ double OptionPricer::computeGreekBS(const std::string greek) {
     }
 
     double timeToMaturity = maturity_ - T0_;
-    double r = interpolateRiskFreeRate(timeToMaturity);
     double q = dividendYield_;
-    double sqrtTime = sqrt(timeToMaturity);
+    double sqrtT = sqrt(timeToMaturity);
 
-    // Calculate d1 and d2 with dividend yield
-    double d1 = (log(S0_ / strike_) + (r - q + 0.5 * volatility_ * volatility_) * timeToMaturity) /
-                (volatility_ * sqrtTime);
-    double d2 = d1 - volatility_ * sqrtTime;
+    // Compute the discount factor D = exp(-∫ r(t) dt from T0_ to maturity_)
+    double D = computeDiscountedStrike(1.0, T0_, maturity_); 
 
-    // Calculate N(d1), N(d2), N(-d2), and N'(d1)
+    // Forward price under the term structure: F = S0 * exp(-q*T) / D
+    double F = S0_ * exp(-q * timeToMaturity) / D;
+
+    // Compute d1 and d2 using forward price
+    double d1 = (log(F / strike_) + 0.5 * volatility_ * volatility_ * timeToMaturity) / (volatility_ * sqrtT);
+    double d2 = d1 - volatility_ * sqrtT;
+
     double Nd1 = normCDF(d1);
     double Nd2 = normCDF(d2);
     double N_minus_d1 = normCDF(-d1);
     double N_minus_d2 = normCDF(-d2);
     double npd1 = normPDF(d1);
 
-    // Compute Greeks with dividend yield
     if (greek == "Delta") {
-        if (optionType_ == "Call") {return exp(-q * timeToMaturity) * Nd1;} // Call delta 
-        else {return exp(-q * timeToMaturity) * (Nd1 - 1.0);} // Put delta
+        if (optionType_ == "Call") {
+            return exp(-q * timeToMaturity) * Nd1;
+        } 
+        else {
+            return exp(-q * timeToMaturity) * (Nd1 - 1.0);
+        }
     } 
-    else if (greek == "Gamma") {return (exp(-q * timeToMaturity) * npd1) / (S0_ * volatility_ * sqrtTime);} 
+    else if (greek == "Gamma") {
+        return (exp(-q * timeToMaturity) * npd1) / (S0_ * volatility_ * sqrtT);
+    } 
     else if (greek == "Theta") {
-        double term1 = - (S0_ * npd1 * volatility_ * exp(-q * timeToMaturity)) / (2.0 * sqrtTime);
+        double fwdRate = interpolateRiskFreeRate(maturity_);
+        double term1 = -(S0_ * npd1 * volatility_ * exp(-q * timeToMaturity)) / (2.0 * sqrtT);
+        
         if (optionType_ == "Call") {
             double term2 = q * S0_ * exp(-q * timeToMaturity) * Nd1;
-            double term3 = - r * strike_ * exp(-r * timeToMaturity) * Nd2;
+            double term3 = -fwdRate * strike_ * D * Nd2;
             return (term1 + term2 + term3) / DAYS_IN_A_YEAR; // Convert to per day
         } 
         else {
-            double term2 = - q * S0_ * exp(-q * timeToMaturity) * N_minus_d1;
-            double term3 = r * strike_ * exp(-r * timeToMaturity) * N_minus_d2;
+            double term2 = -q * S0_ * exp(-q * timeToMaturity) * N_minus_d1;
+            double term3 = fwdRate * strike_ * D * N_minus_d2;
             return (term1 + term2 + term3) / DAYS_IN_A_YEAR; // Convert to per day
         }
+    }
+    else if (greek == "Vega") {
+        return (S0_ * exp(-q * timeToMaturity) * npd1 * sqrtT) / 100.0;
     } 
-    else if (greek == "Vega") {return (S0_ * exp(-q * timeToMaturity) * npd1 * sqrtTime) / 100.0;} // Per 1% change 
     else if (greek == "Rho") {
-        if (optionType_ == "Call") {return (strike_ * timeToMaturity * exp(-r * timeToMaturity) * Nd2) / 100.0;} // Per 1% change 
-        else {return (-strike_ * timeToMaturity * exp(-r * timeToMaturity) * N_minus_d2) / 100.0;} // Per 1% change
+        if (optionType_ == "Call") {
+            return (strike_ * timeToMaturity * D * Nd2) / 100.0;
+        } 
+        else {
+            return (-strike_ * timeToMaturity * D * N_minus_d2) / 100.0;
+        }
     } 
     else {
-        throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega and Rho.");
+        throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega, Rho.");
     }
 }
 

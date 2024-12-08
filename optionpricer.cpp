@@ -1,6 +1,7 @@
 #include "OptionPricer.h"
 #include <cmath>
 #include <fstream>
+#include <algorithm>
 namespace project {
 
 const double DAYS_IN_A_YEAR = 365.0;
@@ -291,7 +292,7 @@ double OptionPricer::computeGreekBS(const std::string greek) {
     }
 
     double timeToMaturity = maturity_ - T0_;
-    double r = interpolateRiskFreeRate(T0_);
+    double r = interpolateRiskFreeRate(timeToMaturity);
     double q = dividendYield_;
     double sqrtTime = sqrt(timeToMaturity);
 
@@ -407,11 +408,12 @@ void OptionPricer::compareGreeks(std::string greek) {
 
 // Method to compute PDE prices for a range of values
 std::vector<double> OptionPricer::computePricesVector(const std::string param, const std::vector<double>& paramRange) {    
-    if (param != "Spot" && param != "Maturity" && param != "Volatility") {
-        throw std::invalid_argument("Param name should be 'Spot', 'Maturity' or 'Volatility'");
+    if (param != "Spot" && param != "Maturity" && param != "Volatility" && param != "Moneyness") {
+        throw std::invalid_argument("Param name should be \"Spot\", \"Maturity\", \"Volatility\" or \"Moneyness\"");
     }
 
     std::vector<double> prices(paramRange.size());
+    double discountedStrike = computeDiscountedStrike(strike_, T0_, maturity_); // In case we use the Moneyness
 
     for (unsigned int i = 0; i < paramRange.size(); i++) {
         double v = paramRange[i];
@@ -424,6 +426,10 @@ std::vector<double> OptionPricer::computePricesVector(const std::string param, c
         else if (param == "Volatility") {
             prices[i] = computePricePDE(S0_, maturity_, v);
         }
+        else if (param == "Moneyness") {
+            double S = paramRange[i] * discountedStrike; // Compute the spot as S = Moneyness * discounted Strike
+            prices[i] = computePricePDE(S, maturity_, volatility_);
+        }
     }
 
     return prices;
@@ -431,11 +437,12 @@ std::vector<double> OptionPricer::computePricesVector(const std::string param, c
 
 // Method to compute PDE greeks for a range of values
 std::vector<double> OptionPricer::computeGreeksVector(const std::string greek, const std::string param, const std::vector<double>& paramRange) {
-    if (param != "Spot" && param != "Maturity" && param != "Volatility") {
-        throw std::invalid_argument("Param name should be 'Spot', 'Maturity' or 'Volatility'");
+    if (param != "Spot" && param != "Maturity" && param != "Volatility" && param != "Moneyness") {
+        throw std::invalid_argument("Param name should be \"Spot\", \"Maturity\", \"Volatility\" or \"Moneyness\"");
     }
 
     std::vector<double> greeks(paramRange.size());
+    double discountedStrike = computeDiscountedStrike(strike_, T0_, maturity_); // In case we use the Moneyness
 
     for (unsigned int i = 0; i < paramRange.size(); i++) {
         double v = paramRange[i];
@@ -447,6 +454,10 @@ std::vector<double> OptionPricer::computeGreeksVector(const std::string greek, c
         }
         else if (param == "Volatility") {
             greeks[i] = computeGreekNumerical(greek, S0_, maturity_, v);
+        }
+        else if (param == "Moneyness") {
+            double S = paramRange[i] * discountedStrike; // Compute the spot as S = Moneyness * discounted Strike
+            greeks[i] = computeGreekNumerical(greek, S, maturity_, volatility_);
         }
     }
 
@@ -469,7 +480,7 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
     // Loop over time steps
     for (int j = 0; j <= k_; j++) {
         double timeToMaturity = maturity_ - timeSteps_[j];
-        double boundaryPrice = -1.0;
+        double boundaryPrice = -1.0; // Threshold for updating the boundary price
 
         // For an American Put Option
         if (optionType_ == "Put" && exerciseType_ == "American") {
@@ -503,7 +514,8 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
 
         // If boundary price was found, add it to the vector (we add the relative price so that the boundary plot doesn't depend on it)
         if (boundaryPrice >= 0.0) {
-            exerciseBoundary.push_back(std::make_pair(timeToMaturity, boundaryPrice / strike_));
+            double discountedStrike = computeDiscountedStrike(strike_, timeSteps_[j], maturity_);
+            exerciseBoundary.push_back(std::make_pair(timeToMaturity, boundaryPrice / discountedStrike));
         }
     }
 
@@ -550,6 +562,35 @@ std::vector<double> OptionPricer::solveTridiagThomas(
     }
 
     return x;
+}
+
+double OptionPricer::computeDiscountedStrike(double strike, double startTime, double endTime) {
+    // Collect all relevant time points for integration
+    std::vector<double> integrationTimes;
+    integrationTimes.push_back(startTime);
+    for (double t : riskFreeTimes_) {
+        if (t > startTime && t < endTime) {
+            integrationTimes.push_back(t);
+        }
+    }
+    integrationTimes.push_back(endTime);
+
+    // Ensure they are sorted
+    std::sort(integrationTimes.begin(), integrationTimes.end());
+
+    // Perform trapezoidal integration of r(t) from startTime to endTime
+    double integral = 0.0;
+    for (size_t i = 1; i < integrationTimes.size(); i++) {
+        double t1 = integrationTimes[i - 1];
+        double t2 = integrationTimes[i];
+        double r1 = interpolateRiskFreeRate(t1);
+        double r2 = interpolateRiskFreeRate(t2);
+        double dt = t2 - t1;
+        integral += 0.5 * (r1 + r2) * dt;
+    }
+
+    // Compute discounted strike
+    return strike * exp(-integral);
 }
 
 

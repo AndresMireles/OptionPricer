@@ -165,6 +165,9 @@ private:
         std::vector<double> d // Right-hand side
     );
 
+    // Method to compute the discounted strike by integrating r(t)
+    double computeDiscountedStrike(double strike, double startTime, double endTime);
+
 };
 
 } // namespace project

@@ -80,7 +80,7 @@ void OptionPricer::setupGrid(double S0, double maturity) {
 
     // Define time and spot intervals based on n_, k_, S0_, and T0_
     double dt = (maturity - T0_) / k_;
-    double dS = 2 * S0 / n_; // Creates a symmetric spot price range around S0_
+    double dS = 3 * S0 / n_; // Creates a symmetric spot price range around S0_
 
     // Populate spot prices for each step
     spotPrices_.resize(n_ + 1);
@@ -218,14 +218,12 @@ double OptionPricer::computePricePDE(double S0, double maturity, double volatili
     initializeConditions(maturity, deltaR);
     performCalculations(volatility, deltaR);
 
-    if (n_ % 2 == 0) {
-        int lowerMid = n_ / 2 - 1;
-        int upperMid = n_ / 2;
-        return (grid_[lowerMid][0] + grid_[upperMid][0]) / 2.0;
-    } 
-    else {
-        return grid_[n_ / 2][0];
-    }
+    auto it = std::min_element(spotPrices_.begin(), spotPrices_.end(),
+        [&](double a, double b) { return std::abs(a - S0) < std::abs(b - S0); });
+    int index = std::distance(spotPrices_.begin(), it);
+
+    // Return the option price at the identified index
+    return grid_[index][0];
 }
 
 // Function to compute the cumulative distribution function for the standard normal distribution

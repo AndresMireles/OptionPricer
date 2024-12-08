@@ -98,6 +98,7 @@ void OptionPricer::setupGrid(double S0, double maturity) {
 // Method for setting up the initial conditions
 void OptionPricer::initializeConditions(double maturity, double deltaR) {
     bool isCall = (optionType_ == "Call");
+    bool isAmerican = (exerciseType_ == "American");
     double q = dividendYield_;
 
     // Initial condition at maturity (t = T)
@@ -120,7 +121,12 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
             grid_[0][j] = 0.0; // Call option is worthless
         } 
         else {
-            grid_[0][j] = strike_ * D_t_T;
+            if (isAmerican) {
+                grid_[0][j] = strike_; // American put: optimal to exercise early
+            }
+            else {
+                grid_[0][j] = strike_ * D_t_T; // European put
+            }
         }
     }
 
@@ -133,7 +139,7 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
             grid_[n_][j] = spotPrices_[n_] * exp(-q * (maturity - t)) - strike_ * D_t_T;
         } 
         else {
-            grid_[n_][j] = 0.0; // Call option is worthless
+            grid_[n_][j] = 0.0; // Put option is worthless with large S
         }
     }
 }
@@ -515,8 +521,9 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
                 double payoff = std::max(strike_ - spotPrice, 0.0);
 
                 // Check if the option value equals the payoff within tolerance
-                if (std::abs(optionValue - payoff) < tolerance) {
+                if (std::abs(optionValue - payoff) < tolerance && optionValue > tolerance && spotPrice > tolerance) {
                     boundaryPrice = spotPrice;
+                    std::cout << "Boundary found at S = " << spotPrice << ", V = " << optionValue << ", payoff = " << payoff << ", diff = " << fabs(optionValue - payoff) << std::endl;
                     break; // Found the boundary
                 }
             }
@@ -529,7 +536,7 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
                 double optionValue = grid_[i][j];
                 double payoff = std::max(spotPrice - strike_, 0.0);
 
-                if (std::abs(optionValue - payoff) < tolerance) {
+                if (std::abs(optionValue - payoff) < tolerance && optionValue > tolerance && spotPrice > tolerance) {
                     boundaryPrice = spotPrice;
                     break;
                 }

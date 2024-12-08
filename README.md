@@ -13,4 +13,3 @@ The **Option Pricing Library** is a C++ project designed to model and price fina
 - **Greeks Calculation**: Compute sensitivities such as Delta, Gamma, Theta, Vega, and Rho using both analytical (Black-Scholes) and numerical (Finite Difference) methods.
 - **Parameter Analysis**: Evaluate option prices and Greeks over a range of parameter values (e.g., varying spot price, maturity, or volatility).
 - **Exercise Boundary Determination**: Calculate and export the optimal exercise boundary for American options.
-- **Comprehensive Documentation**: Detailed inline documentation using Doxygen-style comments.

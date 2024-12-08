@@ -526,7 +526,7 @@ void OptionPricer::saveExerciseBoundaryToFile(const std::string& filename) {
     auto boundary = computeExerciseBoundary();
     std::ofstream file(filename);
     if (file.is_open()) {
-        file << "Time To Maturity,Asset Price Over Strike\n";
+        file << "Time To Maturity,Moneyness\n";
         for (const auto& point : boundary) {
             file << point.first << "," << point.second << "\n";
         }

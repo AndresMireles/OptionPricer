@@ -100,7 +100,7 @@ public:
 /**
  * @brief Overloads the << operator to output the details of an Option object.
  *
- * This function allows you to use the << operator with std::ostream to print
+ * This function allows to use the << operator with std::ostream to print
  * the details of an Option object in a readable format.
  *
  * @param st The output stream.

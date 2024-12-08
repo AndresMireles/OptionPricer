@@ -420,16 +420,16 @@ std::vector<double> OptionPricer::computePricesVector(const std::string param, c
         if (param == "Spot") {
             prices[i] = computePricePDE(v, maturity_, volatility_);
         }
+        else if (param == "Moneyness") {
+            double S = paramRange[i] * discountedStrike; // Compute the spot as S = Moneyness * discounted Strike
+            prices[i] = computePricePDE(S, maturity_, volatility_);
+        }
         else if (param == "Maturity") {
             prices[i] = computePricePDE(S0_, v, volatility_);
         }
         else if (param == "Volatility") {
             prices[i] = computePricePDE(S0_, maturity_, v);
-        }
-        else if (param == "Moneyness") {
-            double S = paramRange[i] * discountedStrike; // Compute the spot as S = Moneyness * discounted Strike
-            prices[i] = computePricePDE(S, maturity_, volatility_);
-        }
+        }   
     }
 
     return prices;
@@ -449,15 +449,15 @@ std::vector<double> OptionPricer::computeGreeksVector(const std::string greek, c
         if (param == "Spot") {
             greeks[i] = computeGreekNumerical(greek, v, maturity_, volatility_);
         }
+        else if (param == "Moneyness") {
+            double S = paramRange[i] * discountedStrike; // Compute the spot as S = Moneyness * discounted Strike
+            greeks[i] = computeGreekNumerical(greek, S, maturity_, volatility_);
+        }
         else if (param == "Maturity") {
             greeks[i] = computeGreekNumerical(greek, S0_, v, volatility_);
         }
         else if (param == "Volatility") {
             greeks[i] = computeGreekNumerical(greek, S0_, maturity_, v);
-        }
-        else if (param == "Moneyness") {
-            double S = paramRange[i] * discountedStrike; // Compute the spot as S = Moneyness * discounted Strike
-            greeks[i] = computeGreekNumerical(greek, S, maturity_, volatility_);
         }
     }
 

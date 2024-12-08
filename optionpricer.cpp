@@ -291,7 +291,7 @@ void OptionPricer::comparePrices() {
 
     double PDEError = PDEPrice - BSPrice;
 
-    std::cout << "Black-Scholes price: " << BSPrice << ". PDE Price: " << PDEPrice << ". PDE Error: " << PDEError << ". PDE Relative Error: " << std::abs(PDEError / BSPrice) * 100 << "%." << std::endl;
+    std::cout << "Black-Scholes price: " << BSPrice << ". PDE Price: " << PDEPrice << ". PDE Error: " << PDEError << ". PDE Relative Error: " << abs(PDEError / BSPrice) * 100 << "%." << std::endl;
 }
 
 // Implementation of the standard normal PDF
@@ -433,7 +433,7 @@ void OptionPricer::compareGreeks(std::string greek) {
 
     double numericalError = numericalGreek - BSGreek;
 
-    std::cout << "Black-Scholes " << greek << ": " << BSGreek << ". Finite-Differences " << greek << ": " << numericalGreek << ". Numerical Error: " << numericalError << ". Numerical Relative Error: " << std::abs(numericalError / BSGreek) * 100 << "%." << std::endl;
+    std::cout << "Black-Scholes " << greek << ": " << BSGreek << ". Finite-Differences " << greek << ": " << numericalGreek << ". Numerical Error: " << numericalError << ". Numerical Relative Error: " << abs(numericalError / BSGreek) * 100 << "%." << std::endl;
 }
 
 // Method to compute PDE prices for a range of values
@@ -495,58 +495,71 @@ std::vector<double> OptionPricer::computeGreeksVector(const std::string greek, c
 }
 
 std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
-
-    // We compute the price using the parameters of the pricer (to avoid errors if other methods are executed that modify the grid)
-    computePricePDE(S0_, maturity_, volatility_);
+    // Compute PDE price with deltaR = 0
+    computePricePDE(S0_, maturity_, volatility_, 0.0);
 
     std::vector<std::pair<double, double>> exerciseBoundary;
-    double tolerance = 1e-6; // Tolerance for floating-point comparison
 
-    // Ensure the grid has been computed
-    if (grid_.empty()) {
-        throw std::runtime_error("Option grid not computed. Please run computePrice('PDE') first.");
+    // If not American, no boundary
+    if (exerciseType_ != "American") {
+        return exerciseBoundary;
     }
 
-    // Loop over time steps
-    for (int j = 0; j <= k_; j++) {
+    // Relative tolerance for near-equality detection
+    double relativeTolerance = 1e-4;
+    double priceTolerance = 1e-2;
+
+    for (int j = 0; j < k_; j++) {
         double timeToMaturity = maturity_ - timeSteps_[j];
-        double boundaryPrice = -1.0; // Threshold for updating the boundary price
+        double boundaryPrice = -1.0;
 
-        // For an American Put Option
-        if (optionType_ == "Put" && exerciseType_ == "American") {
-            // Loop over spot prices
+        if (optionType_ == "Put") {
             for (int i = 0; i <= n_; i++) {
-                double spotPrice = spotPrices_[i];
+                double S = spotPrices_[i];
                 double optionValue = grid_[i][j];
-                double payoff = std::max(strike_ - spotPrice, 0.0);
+                double payoff = std::max(strike_ - S, 0.0);
+                double diff = optionValue - payoff;
 
-                // Check if the option value equals the payoff within tolerance
-                if (std::abs(optionValue - payoff) < tolerance && optionValue > tolerance && spotPrice > tolerance) {
-                    boundaryPrice = spotPrice;
-                    std::cout << "Boundary found at S = " << spotPrice << ", V = " << optionValue << ", payoff = " << payoff << ", diff = " << fabs(optionValue - payoff) << std::endl;
-                    break; // Found the boundary
-                }
-            }
-        }
-        // For an American Call Option
-        else if (optionType_ == "Call" && exerciseType_ == "American") {
-            // Loop over spot prices in reverse
-            for (int i = n_; i >= 0; --i) {
-                double spotPrice = spotPrices_[i];
-                double optionValue = grid_[i][j];
-                double payoff = std::max(spotPrice - strike_, 0.0);
+                double scale = (payoff > 1e-12) ? payoff : 1.0; // Avoid division by zero
+                double relDiff = abs(diff) / scale;
 
-                if (std::abs(optionValue - payoff) < tolerance && optionValue > tolerance && spotPrice > tolerance) {
-                    boundaryPrice = spotPrice;
+                if (relDiff < relativeTolerance) {
+                    boundaryPrice = S;
+                } 
+                else if (boundaryPrice >= 0.0 && relDiff >= relativeTolerance && grid_[i][j] > priceTolerance && spotPrices_[i] > priceTolerance) {
+                    // Once we break the near-equality condition, we can stop. The previous S was boundary.
                     break;
                 }
             }
-        }
 
-        // If boundary price was found, add it to the vector (we add the relative price so that the boundary plot doesn't depend on it)
-        if (boundaryPrice >= 0.0) {
-            double discountedStrike = computeDiscountedStrike(strike_, timeSteps_[j], maturity_);
-            exerciseBoundary.push_back(std::make_pair(timeToMaturity, boundaryPrice / discountedStrike));
+            // For a put, boundary should be less or around strike. If boundaryPrice is absurd (e.g., at Smax), discard it.
+            if (boundaryPrice > 0.0 && boundaryPrice <= (1.5 * strike_)) {
+                exerciseBoundary.emplace_back(std::make_pair(timeToMaturity, boundaryPrice));
+            }
+
+        } 
+        else if (optionType_ == "Call") {
+            for (int i = n_; i >= 0; --i) {
+                double S = spotPrices_[i];
+                double optionValue = grid_[i][j];
+                double payoff = std::max(S - strike_, 0.0);
+                double diff = optionValue - payoff;
+
+                double scale = (payoff > 1e-12) ? payoff : 1.0;
+                double relDiff = std::fabs(diff) / scale;
+
+                if (relDiff < relativeTolerance && grid_[i][j] > priceTolerance && spotPrices_[i] > priceTolerance) {
+                    // Found a region near equality, candidate boundary and stop
+                    boundaryPrice = S;
+                    break;
+                }
+            }
+
+            // For calls with q>0, boundary should be large, but not absurdly at Smax. If boundary is at Smax, it's suspicious.
+            if (boundaryPrice > 0.0 && boundaryPrice < (1.9 * strike_)) {
+                exerciseBoundary.emplace_back(std::make_pair(timeToMaturity, boundaryPrice));
+            }
+
         }
     }
 
@@ -557,7 +570,7 @@ void OptionPricer::saveExerciseBoundaryToFile(const std::string& filename) {
     auto boundary = computeExerciseBoundary();
     std::ofstream file(filename);
     if (file.is_open()) {
-        file << "Time To Maturity,Moneyness *\n";
+        file << "Time To Maturity,Spot Price\n";
         for (const auto& point : boundary) {
             file << point.first << "," << point.second << "\n";
         }

@@ -505,8 +505,8 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
     }
 
     // Relative tolerance for near-equality detection
-    double relativeTolerance = 1e-5;
-    double priceTolerance = 1e-3;
+    double relativeTolerance = 1e-4;
+    double priceTolerance = 1e-2;
 
     for (int j = 0; j <= k_; j++) {
         double timeToMaturity = maturity_ - timeSteps_[j];

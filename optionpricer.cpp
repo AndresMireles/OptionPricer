@@ -114,21 +114,23 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
     // Boundary condition for S = 0
     for (int j = 0; j <= k_; j++) {
         double t = timeSteps_[j];
-        double r = interpolateRiskFreeRate(t, deltaR);
+        double D_t_T = computeDiscountedStrike(1.0, t, maturity_, deltaR);
+
         if (isCall) {
             grid_[0][j] = 0.0; // Call option is worthless
         } 
         else {
-            grid_[0][j] = strike_ * exp(-r * (maturity - t));
+            grid_[0][j] = strike_ * D_t_T;
         }
     }
 
     // Boundary condition for very high S (highest spot price)
     for (int j = 0; j <= k_; j++) {
         double t = timeSteps_[j];
-        double r = interpolateRiskFreeRate(t, deltaR);
+        double D_t_T = computeDiscountedStrike(1.0, t, maturity_, deltaR);
+
         if (isCall) {
-            grid_[n_][j] = spotPrices_[n_] * exp(-q * (maturity - t)) - strike_ * exp(-r * (maturity - t));
+            grid_[n_][j] = spotPrices_[n_] * exp(-q * (maturity - t)) - strike_ * D_t_T;
         } 
         else {
             grid_[n_][j] = 0.0; // Call option is worthless
@@ -586,7 +588,7 @@ std::vector<double> OptionPricer::solveTridiagThomas(
     return x;
 }
 
-double OptionPricer::computeDiscountedStrike(double strike, double startTime, double endTime) {
+double OptionPricer::computeDiscountedStrike(double strike, double startTime, double endTime, double deltaR) {
     // Collect all relevant time points for integration
     std::vector<double> integrationTimes;
     integrationTimes.push_back(startTime);
@@ -605,8 +607,8 @@ double OptionPricer::computeDiscountedStrike(double strike, double startTime, do
     for (size_t i = 1; i < integrationTimes.size(); i++) {
         double t1 = integrationTimes[i - 1];
         double t2 = integrationTimes[i];
-        double r1 = interpolateRiskFreeRate(t1);
-        double r2 = interpolateRiskFreeRate(t2);
+        double r1 = interpolateRiskFreeRate(t1, deltaR);
+        double r2 = interpolateRiskFreeRate(t2, deltaR);
         double dt = t2 - t1;
         integral += 0.5 * (r1 + r2) * dt;
     }

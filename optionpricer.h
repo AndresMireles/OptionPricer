@@ -166,7 +166,7 @@ private:
     );
 
     // Method to compute the discounted strike by integrating r(t)
-    double computeDiscountedStrike(double strike, double startTime, double endTime);
+    double computeDiscountedStrike(double strike, double startTime, double endTime, double deltaR = 0.0);
 
 };
 

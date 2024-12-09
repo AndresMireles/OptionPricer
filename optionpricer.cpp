@@ -680,5 +680,4 @@ double OptionPricer::computeDiscountedStrike(double strike, double startTime, do
     return strike * exp(-integral);
 }
 
-
 } // namespace project

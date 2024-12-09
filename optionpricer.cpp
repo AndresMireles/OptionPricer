@@ -115,7 +115,7 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
     // Boundary condition for S = 0
     for (int j = 0; j <= k_; j++) {
         double t = timeSteps_[j];
-        double D_t_T = computeDiscountedStrike(1.0, t, maturity_, deltaR);
+        double D_t_T = computeDiscountedStrike(1.0, t, maturity, deltaR);
 
         if (isCall) {
             grid_[0][j] = 0.0; // Call option is worthless
@@ -133,7 +133,7 @@ void OptionPricer::initializeConditions(double maturity, double deltaR) {
     // Boundary condition for very high S (highest spot price)
     for (int j = 0; j <= k_; j++) {
         double t = timeSteps_[j];
-        double D_t_T = computeDiscountedStrike(1.0, t, maturity_, deltaR);
+        double D_t_T = computeDiscountedStrike(1.0, t, maturity, deltaR);
 
         if (isCall) {
             grid_[n_][j] = spotPrices_[n_] * exp(-q * (maturity - t)) - strike_ * D_t_T;

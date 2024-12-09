@@ -33,6 +33,9 @@ OptionPricer::OptionPricer(
     if (riskFreeTimes.size() != riskFreeRates.size()) {
         throw std::invalid_argument("Risk-free times and rates vectors must be of the same size.");
     }
+    if (!std::is_sorted(riskFreeTimes_.begin(), riskFreeTimes_.end())) {
+        throw std::invalid_argument("Risk-free times must be sorted in ascending order.");
+    }
 
     // Pricer parameters
     n_ = n; // Number of spot steps

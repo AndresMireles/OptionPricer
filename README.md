@@ -8,7 +8,7 @@ The **Option Pricing Library** is a C++ project designed to model and price fina
 
 - **Option Representation**: Model financial options with customizable parameters including option type (Call or Put), exercise type (European or American), strike price, maturity, and volatility.
 - **Pricing Methods**:
-  - **Black-Scholes Model**: Analytical pricing for European options.
+  - **Black-Scholes Model**: Analytical pricing for European options (using the Black '76 representation with term structure of interest rates).
   - **Finite Difference PDE Solver**: Numerical pricing for both European and American options.
 - **Greeks Calculation**: Compute sensitivities such as Delta, Gamma, Theta, Vega, and Rho using both analytical (Black-Scholes) and numerical (Finite Difference) methods.
 - **Parameter Analysis**: Evaluate option prices and Greeks over a range of parameter values (e.g., varying spot price, maturity, or volatility).

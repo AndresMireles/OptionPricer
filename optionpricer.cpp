@@ -81,9 +81,9 @@ void OptionPricer::setupGrid(double S0, double maturity) {
     // Set up the grid with n_ + 1 rows and k_ + 1 columns, and fill it with 0
     grid_.resize(n_ + 1, std::vector<double>(k_ + 1, 0.0));
 
-    // Define time and spot intervals based on n_, k_, S0_, and T0_
+    // Define time and spot intervals based on n_, k_, S0_, maturity and T0_
     double dt = (maturity - T0_) / k_;
-    double dS = 3 * S0 / n_; // Creates a symmetric spot price range around S0_
+    double dS = 3 * S0 / n_; // Creates a spot price range around S0 (symmetric if factor = 2)
 
     // Populate spot prices for each step
     spotPrices_.resize(n_ + 1);
@@ -221,7 +221,7 @@ double OptionPricer::computePricePDE(double S0, double maturity, double volatili
     initializeConditions(maturity, deltaR);
     performCalculations(volatility, deltaR);
 
-    // Return the option price at S0 (we need to check where is it)
+    // Return the option price at S0 (we need to check where is it since the grid can be not symmetric)
     auto it = std::min_element(spotPrices_.begin(), spotPrices_.end(),
         [&](double a, double b) { return std::abs(a - S0) < std::abs(b - S0); });
     int index = std::distance(spotPrices_.begin(), it);
@@ -235,6 +235,7 @@ double OptionPricer::normCDF(double x) const {
     return 0.5 * (1.0 + std::erf(x / sqrt(2.0))); // erf function comes from cmath
 }
 
+// Price using the Black-76 model (extension of BS model with a term structure of interest rates)
 double OptionPricer::computePriceBS() {
 
     if (exerciseType_ != "European") {
@@ -375,7 +376,7 @@ double OptionPricer::computeGreekNumerical(const std::string greek, double S0, d
     double h = 0.01; // 1% change in spot price
     double deltaT = 1.0 / DAYS_IN_A_YEAR; // One day change in maturity (in years)
     double deltaVolatility = 0.01; // 1% change in volatility
-    double deltaR = 0.0001; // 0.01% change in risk-free rate
+    double deltaR = 0.0001; // 0.01% (1bps) change in risk-free rate
 
     if (greek == "Delta") {
         double priceUp = computePricePDE(S0 * (1 + h), maturity, volatility);
@@ -412,7 +413,6 @@ double OptionPricer::computeGreekNumerical(const std::string greek, double S0, d
     else {
         throw std::invalid_argument("Invalid Greek requested. Available Greeks: Delta, Gamma, Theta, Vega, Rho.");
     }
-    return 0.0;
 }
 
 // Actual function that the user can use
@@ -534,7 +534,7 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
                 }
             }
 
-            // For a put, boundary should be less or around strike. If boundaryPrice is absurd (e.g., at Smax), discard it.
+            // For a put, boundary should be less or around strike. If boundaryPrice is absurd (e.g., extremely high), discard it.
             if (boundaryPrice > 0.0 && boundaryPrice <= (1.5 * strike_)) {
                 exerciseBoundary.push_back(std::make_pair(timeToMaturity, boundaryPrice));
             }

@@ -8,9 +8,9 @@ namespace project {
 Option::Option() {
     optionType_ = "Call";
     exerciseType_ = "European";
-    strike_ = 0.0;
-    maturity_ = 0.0;
-    volatility_ = 0.0;
+    strike_ = 100.0;
+    maturity_ = 1.0;
+    volatility_ = 0.2;
 }
 
 

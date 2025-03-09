@@ -221,7 +221,7 @@ double OptionPricer::computePricePDE(double S0, double maturity, double volatili
     initializeConditions(maturity, deltaR);
     performCalculations(volatility, deltaR);
 
-    // Return the option price at S0 (we need to check where is it since the grid can be not symmetric)
+    // Return the option price at [T0,S0] (we need to check where is it since the grid can be not symmetric)
     auto it = std::min_element(spotPrices_.begin(), spotPrices_.end(),
         [&](double a, double b) { return std::abs(a - S0) < std::abs(b - S0); });
     int index = std::distance(spotPrices_.begin(), it);

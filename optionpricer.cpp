@@ -514,8 +514,9 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
     for (int j = 0; j <= k_; j++) {
         double timeToMaturity = maturity_ - timeSteps_[j];
         double boundaryPrice = -1.0;
-
+        
         if (optionType_ == "Put") {
+            // In puts, we start from S = S_max
             for (int i = 0; i <= n_; i++) {
                 double S = spotPrices_[i];
                 double optionValue = grid_[i][j];
@@ -547,7 +548,8 @@ std::vector<std::pair<double, double>> OptionPricer::computeExerciseBoundary() {
             bool initialSet = false;
             bool inNearEqualityZone = false;
             int lastGoodIndex = -1;
-
+            
+            // In calls, we start from S = 0
             for (int i = n_; i >= 0; --i) {
                 double S = spotPrices_[i];
                 double optionValue = grid_[i][j];
